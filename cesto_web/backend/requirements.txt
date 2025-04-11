@@ -1,0 +1,8 @@
+Flask==2.0.1
+Flask-SocketIO==5.1.1
+mysql-connector-python==8.0.27
+python-dotenv==0.19.1
+eventlet==0.33.0
+requests==2.26.0
+pymysql==1.0.2
+SQLAlchemy==1.4.27 

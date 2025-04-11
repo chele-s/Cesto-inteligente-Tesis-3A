@@ -1,0 +1,10 @@
+# Requirements for YOLOv8 Waste Detection Training
+ultralytics>=8.0.0
+torch>=2.0.0
+torchvision>=0.15.0
+pyyaml>=6.0
+tensorboard>=2.13.0
+matplotlib>=3.7.0
+pillow>=9.4.0
+opencv-python>=4.7.0
+tqdm>=4.65.0 

@@ -1,0 +1,481 @@
+/* === Variables globales === */
+:root {
+    --primary-color: #3498db;
+    --secondary-color: #2ecc71;
+    --accent-color: #e74c3c;
+    --background-color: #f8f9fa;
+    --panel-background: #ffffff;
+    --text-color: #333333;
+    --text-light: #777777;
+    --border-color: #e0e0e0;
+    --success-color: #27ae60;
+    --warning-color: #f39c12;
+    --error-color: #e74c3c;
+    --info-color: #3498db;
+    
+    /* Colores para tipos de residuos */
+    --metal-color: #a1a1a1;
+    --glass-color: #58b0f0;
+    --plastic-color: #f08a5d;
+    --carton-color: #b7784b;
+}
+
+/* === Reset básico === */
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+body {
+    font-family: 'Segoe UI', 'Roboto', 'Helvetica Neue', sans-serif;
+    line-height: 1.6;
+    color: var(--text-color);
+    background-color: var(--background-color);
+}
+
+/* === Layout === */
+.container {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 20px;
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+}
+
+header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 20px;
+    padding-bottom: 10px;
+    border-bottom: 1px solid var(--border-color);
+}
+
+main {
+    flex-grow: 1;
+}
+
+footer {
+    margin-top: 20px;
+    padding-top: 20px;
+    border-top: 1px solid var(--border-color);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 0.9rem;
+    color: var(--text-light);
+}
+
+/* === Dashboard Grid === */
+.dashboard-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    grid-gap: 20px;
+}
+
+/* === Paneles === */
+.panel {
+    background-color: var(--panel-background);
+    border-radius: 8px;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.05);
+    padding: 20px;
+}
+
+.panel h2 {
+    margin-bottom: 15px;
+    font-size: 1.3rem;
+    color: var(--primary-color);
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.panel h2 i {
+    opacity: 0.7;
+}
+
+/* === Estado del Sistema === */
+.system-status {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.status-dot {
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    display: inline-block;
+}
+
+.status-dot.connected {
+    background-color: var(--success-color);
+    box-shadow: 0 0 8px var(--success-color);
+}
+
+.status-dot.connecting {
+    background-color: var(--warning-color);
+    box-shadow: 0 0 8px var(--warning-color);
+    animation: pulse 1.5s infinite;
+}
+
+.status-dot.disconnected {
+    background-color: var(--error-color);
+    box-shadow: 0 0 8px var(--error-color);
+}
+
+@keyframes pulse {
+    0% { opacity: 0.5; }
+    50% { opacity: 1; }
+    100% { opacity: 0.5; }
+}
+
+/* === Niveles de Llenado === */
+.fill-container {
+    display: flex;
+    justify-content: space-between;
+    height: 250px;
+}
+
+.fill-item {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 10px;
+    margin: 0 10px;
+}
+
+.fill-label {
+    font-weight: bold;
+    text-align: center;
+}
+
+.fill-bar-container {
+    width: 60px;
+    height: 200px;
+    background-color: #f0f0f0;
+    border-radius: 8px;
+    overflow: hidden;
+    position: relative;
+    border: 1px solid var(--border-color);
+}
+
+.fill-bar {
+    position: absolute;
+    bottom: 0;
+    width: 100%;
+    transition: height 0.5s ease-out;
+}
+
+#metal-fill {
+    background-color: var(--metal-color);
+}
+
+#glass-fill {
+    background-color: var(--glass-color);
+}
+
+#plastic-fill {
+    background-color: var(--plastic-color);
+}
+
+#carton-fill {
+    background-color: var(--carton-color);
+}
+
+.fill-percentage {
+    font-weight: bold;
+    text-align: center;
+}
+
+/* === Estadísticas === */
+.statistics {
+    grid-column: span 1;
+}
+
+.stat-item {
+    text-align: center;
+    margin-bottom: 20px;
+}
+
+.stat-item h3 {
+    font-size: 1rem;
+    color: var(--text-light);
+    margin-bottom: 5px;
+}
+
+.stat-value {
+    font-size: 2.5rem;
+    font-weight: bold;
+    color: var(--primary-color);
+}
+
+.stat-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    grid-gap: 15px;
+}
+
+.stat-card {
+    background-color: #f9f9f9;
+    border-radius: 8px;
+    padding: 15px;
+    text-align: center;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    transition: transform 0.2s, box-shadow 0.2s;
+}
+
+.stat-card:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 6px 12px rgba(0,0,0,0.1);
+}
+
+.stat-icon {
+    font-size: 1.8rem;
+    margin-bottom: 10px;
+}
+
+.stat-count {
+    font-size: 1.5rem;
+    font-weight: bold;
+    margin-bottom: 5px;
+}
+
+.stat-title {
+    font-size: 0.9rem;
+    color: var(--text-light);
+}
+
+/* Colores específicos para cards */
+#metal-card .stat-icon {
+    color: var(--metal-color);
+}
+
+#glass-card .stat-icon {
+    color: var(--glass-color);
+}
+
+#plastic-card .stat-icon {
+    color: var(--plastic-color);
+}
+
+#carton-card .stat-icon {
+    color: var(--carton-color);
+}
+
+/* === Sistema Info === */
+.info-container {
+    display: flex;
+    flex-direction: column;
+    gap: 15px;
+}
+
+.info-item {
+    display: flex;
+    gap: 10px;
+}
+
+.info-label {
+    font-weight: bold;
+    min-width: 150px;
+}
+
+.info-value {
+    flex: 1;
+}
+
+/* === Última Detección === */
+.detection-container {
+    padding: 20px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 100px;
+}
+
+.detected-item {
+    display: flex;
+    align-items: center;
+    gap: 20px;
+    padding: 15px;
+    background-color: #f9f9f9;
+    border-radius: 8px;
+    width: 100%;
+}
+
+.detection-icon {
+    font-size: 2.5rem;
+    width: 60px;
+    height: 60px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 50%;
+    background-color: #f0f0f0;
+    color: var(--text-light);
+}
+
+.detection-info {
+    flex: 1;
+}
+
+.detection-class {
+    font-size: 1.3rem;
+    font-weight: bold;
+}
+
+.detection-confidence {
+    color: var(--text-light);
+    font-size: 0.9rem;
+}
+
+/* Class-specific detection styles */
+.detected-item.metal .detection-icon {
+    color: white;
+    background-color: var(--metal-color);
+}
+
+.detected-item.glass .detection-icon {
+    color: white;
+    background-color: var(--glass-color);
+}
+
+.detected-item.plastic .detection-icon {
+    color: white;
+    background-color: var(--plastic-color);
+}
+
+.detected-item.carton .detection-icon {
+    color: white;
+    background-color: var(--carton-color);
+}
+
+/* === Botones === */
+.refresh-time {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+#refresh-button {
+    background-color: var(--primary-color);
+    color: white;
+    border: none;
+    border-radius: 50%;
+    width: 30px;
+    height: 30px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: background-color 0.2s;
+}
+
+#refresh-button:hover {
+    background-color: #2980b9;
+}
+
+#refresh-button i {
+    font-size: 0.8rem;
+}
+
+#refresh-button.spinning i {
+    animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+    from { transform: rotate(0deg); }
+    to { transform: rotate(360deg); }
+}
+
+/* === Toast Notification === */
+.toast {
+    position: fixed;
+    bottom: 20px;
+    right: 20px;
+    background-color: var(--panel-background);
+    box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+    padding: 15px;
+    border-radius: 8px;
+    display: flex;
+    align-items: center;
+    gap: 15px;
+    max-width: 350px;
+    z-index: 1000;
+    transition: transform 0.3s, opacity 0.3s;
+}
+
+.toast.hidden {
+    transform: translateX(400px);
+    opacity: 0;
+}
+
+.toast-icon {
+    color: var(--info-color);
+    font-size: 1.5rem;
+}
+
+.toast-message {
+    flex: 1;
+}
+
+.toast-close {
+    background: none;
+    border: none;
+    cursor: pointer;
+    font-size: 1.2rem;
+    color: var(--text-light);
+}
+
+.toast.error .toast-icon {
+    color: var(--error-color);
+}
+
+.toast.success .toast-icon {
+    color: var(--success-color);
+}
+
+/* === Media Queries === */
+@media (max-width: 768px) {
+    .dashboard-grid {
+        grid-template-columns: 1fr;
+    }
+    
+    .fill-container {
+        flex-wrap: wrap;
+        height: auto;
+        gap: 20px;
+    }
+    
+    .fill-item {
+        width: 45%;
+        margin-bottom: 20px;
+    }
+    
+    footer {
+        flex-direction: column;
+        gap: 10px;
+        text-align: center;
+    }
+}
+
+@media (max-width: 480px) {
+    header {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 10px;
+    }
+    
+    .fill-item {
+        width: 100%;
+    }
+    
+    .stat-grid {
+        grid-template-columns: 1fr;
+    }
+} 

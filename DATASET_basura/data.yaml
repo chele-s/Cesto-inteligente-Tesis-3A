@@ -1,0 +1,33 @@
+# -----------------------------------------------------------------------------
+# data.yaml - Configuración del dataset para entrenamiento de YOLOv8
+# Proyecto: Cesto Inteligente - Clasificador Automático de Residuos
+# -----------------------------------------------------------------------------
+
+# Rutas al dataset (relativas al directorio donde ejecutas train_yolo.py)
+train: ./DATASET_basura/images/train  # Imágenes de entrenamiento
+val: ./DATASET_basura/images/val      # Imágenes de validación
+test: ./DATASET_basura/images/test    # Imágenes de test (opcional)
+
+# Configuración de clases
+nc: 4  # Número de clases (debe coincidir con la longitud de la lista 'names')
+
+# Nombres de clases
+names:
+  - Metal   # Clase 0
+  - Glass   # Clase 1
+  - Plastic # Clase 2
+  - Carton  # Clase 3
+
+# Parámetros adicionales para YOLOv8
+# Estos parámetros son opcionales y se pueden ajustar según necesidades específicas
+epochs: 100         # Número de épocas recomendado para este dataset
+patience: 25        # Paciencia para early stopping
+batch: 16           # Tamaño del batch recomendado
+img_size: 640       # Tamaño de imagen para entrenamiento
+optimizer: 'Adam'   # Optimizador recomendado
+
+# NOTA: Asegúrate de que las siguientes condiciones se cumplan:
+# 1. Las rutas a 'train', 'val' y 'test' existen y contienen las imágenes correspondientes
+# 2. El número de clases (nc) coincide exactamente con la longitud de la lista 'names'
+# 3. El orden de las clases en 'names' coincide con los índices usados en los archivos de etiquetas
+# 4. No cambies el orden de las clases una vez iniciado el entrenamiento o la implementación 
