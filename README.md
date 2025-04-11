@@ -198,7 +198,7 @@ Cesto_Inteligente_Proyecto/
 
 ## Licencia
 
-Este proyecto se distribuye bajo la Licencia MIT. Ver el archivo `LICENSE` para más detalles (si decides añadir uno).
+Este proyecto se distribuye bajo la Licencia MIT. Ver el archivo `LICENSE` para más detalles.
 
 ## Agradecimientos
 
