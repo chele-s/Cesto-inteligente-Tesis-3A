@@ -175,21 +175,21 @@ WINDOW_TITLE = config.get('window_title')
 WINDOW_GEOMETRY = config.get('window_geometry')
 
 # --- Configuración de la GUI ---
-# Rutas a los recursos gráficos (relativas a main.py)
-UI_ASSETS_PATH = "ui_assets/"
-BACKGROUND_IMG_PATH = UI_ASSETS_PATH + "Canva.png" # Imagen de fondo
-EXAMPLE_IMG_PATHS = {
+# Rutas a los recursos gráficos (obtenidas del config.json)
+UI_ASSETS_PATH = config.get('ui_assets.base_path', "ui_assets/")
+BACKGROUND_IMG_PATH = config.get('ui_assets.background', UI_ASSETS_PATH + "Canva.png")
+EXAMPLE_IMG_PATHS = config.get('ui_assets.example_images', {
     'Metal': UI_ASSETS_PATH + "metal.png",
     'Glass': UI_ASSETS_PATH + "vidrio.png",
     'Plastic': UI_ASSETS_PATH + "plastico.png",
     'Carton': UI_ASSETS_PATH + "carton.png",
-}
-EXAMPLE_TXT_PATHS = {
+})
+EXAMPLE_TXT_PATHS = config.get('ui_assets.example_texts', {
     'Metal': UI_ASSETS_PATH + "metaltxt.png",
     'Glass': UI_ASSETS_PATH + "vidriotxt.png",
     'Plastic': UI_ASSETS_PATH + "plasticotxt.png",
     'Carton': UI_ASSETS_PATH + "cartontxt.png",
-}
+})
 
 # --- Variables Globales ---
 # Usadas para compartir estado entre funciones y la GUI
@@ -480,10 +480,12 @@ class FrameProcessor:
         """
         self.frame_buffer = queue.Queue(maxsize=buffer_size)
         self.last_processed_frame = None
+        self.last_detections = []  # Lista de todas las detecciones válidas del último frame
         self.skip_frames = skip_frames
         self.frame_counter = 0
         self.processing_thread = None
         self.processing_active = False
+        self.is_running = False  # Estado para verificar si está activo
         
     def start_processing(self, model, min_confidence, callback):
         """
@@ -495,6 +497,7 @@ class FrameProcessor:
             callback: Función a llamar con los resultados de la detección
         """
         self.processing_active = True
+        self.is_running = True
         self.processing_thread = threading.Thread(
             target=self._process_frames_loop,
             args=(model, min_confidence, callback),
@@ -510,6 +513,7 @@ class FrameProcessor:
             # Esperar a que termine el hilo, con timeout
             self.processing_thread.join(timeout=1.0)
             logger.info("Hilo de procesamiento de frames detenido")
+        self.is_running = False
         
     def add_frame(self, frame):
         """
@@ -556,8 +560,10 @@ class FrameProcessor:
                 # Procesar frame con YOLO
                 results = model(frame, stream=True, verbose=False)
                 
-                # Encontrar la mejor detección
-                best_detection = None
+                # Lista para almacenar todas las detecciones válidas
+                all_detections = []
+                
+                # Obtener detecciones válidas
                 for res in results:
                     boxes = res.boxes
                     for box in boxes:
@@ -566,34 +572,50 @@ class FrameProcessor:
                             cls_index = int(box.cls[0])
                             # Verificar si el índice es válido
                             if 0 <= cls_index < len(CLASS_NAMES):
-                                if best_detection is None or conf > best_detection['conf']:
-                                    best_detection = {
-                                        'box': list(map(int, box.xyxy[0])),
-                                        'conf': conf,
-                                        'cls_index': cls_index,
-                                        'cls_name': CLASS_NAMES[cls_index],
-                                        'frame': frame.copy()
-                                    }
+                                detection = {
+                                    'box': list(map(int, box.xyxy[0])),
+                                    'conf': conf,
+                                    'cls_index': cls_index,
+                                    'cls_name': CLASS_NAMES[cls_index]
+                                }
+                                all_detections.append(detection)
                 
-                # Guardar referencia y llamar al callback
+                # Ordenar detecciones por confianza (mayor a menor)
+                if all_detections:
+                    all_detections.sort(key=lambda x: x['conf'], reverse=True)
+                
+                # Guardar referencias
                 self.last_processed_frame = frame.copy()
-                callback(best_detection)
+                self.last_detections = all_detections
+                
+                # Llamar al callback con la mejor detección (si hay) y todas las detecciones
+                best_detection = all_detections[0] if all_detections else None
+                if best_detection:
+                    best_detection['frame'] = frame.copy()
+                
+                callback(best_detection, all_detections)
                 
             except Exception as e:
                 logger.error(f"Error en hilo de procesamiento de frames: {e}")
 
-# --- Modificar scanning_loop para usar el procesador de frames ---
+# --- Modificar scanning_loop para usar las detecciones guardadas ---
 # Crear una instancia global del procesador
 frame_processor = FrameProcessor(buffer_size=5, skip_frames=1)
 
-def detection_callback(detection_result):
-    """Callback que se llama cuando el procesador de frames tiene una detección."""
+def detection_callback(best_detection, all_detections=None):
+    """
+    Callback que se llama cuando el procesador de frames tiene una detección.
+    
+    Args:
+        best_detection: La mejor detección (mayor confianza)
+        all_detections: Lista de todas las detecciones válidas
+    """
     global last_detected_class_index, motor_busy
 
-    if detection_result:
+    if best_detection:
         # Tenemos una detección
-        cls_index = detection_result['cls_index']
-        cls_name = detection_result['cls_name']
+        cls_index = best_detection['cls_index']
+        cls_name = best_detection['cls_name']
         
         # Mostrar la imagen de ejemplo asociada
         display_example_images(cls_name)
@@ -622,14 +644,12 @@ def detection_callback(detection_result):
             last_detected_class_index = cls_index
 
             # Nuevo: Actualizar adaptador web con la detección actual
-            if detection_result and 'class_name' in detection_result:
-                # Preparar datos para el adaptador web
-                detection_data = {
-                    'class_name': detection_result['class_name'],
-                    'confidence': detection_result['confidence']
-                }
-                # Actualizar adaptador web
-                main_web_adapter.update_data(detection=detection_data)
+            detection_data = {
+                'class_name': cls_name,
+                'confidence': best_detection['conf']
+            }
+            # Actualizar adaptador web
+            main_web_adapter.update_data(detection=detection_data)
     else:
         # No hay detección, limpiar si no hay motor activo
         if not motor_busy and last_detected_class_index != -1:
@@ -642,6 +662,10 @@ def scanning_loop():
     """
     global last_detected_class_index, motor_busy, cap, model
     global lblVideo
+    
+    # Variables de seguimiento para reintentos de cámara
+    MAX_CAMERA_RETRIES = 5
+    camera_retries = 0
     
     # Actualizar contador de frames y calcular FPS
     processing_stats['frame_count'] += 1
@@ -656,18 +680,69 @@ def scanning_loop():
         update_status_indicators()
     
     if cap is None or not cap.isOpened():
-        logger.error("Cámara no disponible o cerrada. Deteniendo escaneo.")
-        if pantalla:
-            pantalla.quit()
-        return
+        logger.error("Cámara no disponible o cerrada. Intentando reconectar...")
+        try:
+            if cap is not None:
+                cap.release()  # Liberar recursos antes de intentar reconectar
+            
+            # Verificar si excedimos el número máximo de reintentos
+            if camera_retries >= MAX_CAMERA_RETRIES:
+                logger.critical(f"Se alcanzó el máximo de {MAX_CAMERA_RETRIES} reintentos de reconexión de cámara. Deteniendo escaneo.")
+                if pantalla:
+                    # Mostrar mensaje de error en la GUI
+                    if lblVideo:
+                        error_img = np.zeros((300, 400, 3), dtype=np.uint8)
+                        cv2.putText(error_img, "ERROR DE CAMARA", (50, 150), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 255), 2)
+                        img_rgb = cv2.cvtColor(error_img, cv2.COLOR_BGR2RGB)
+                        img_pil = Image.fromarray(img_rgb)
+                        img_tk = ImageTk.PhotoImage(image=img_pil)
+                        lblVideo.configure(image=img_tk)
+                        lblVideo.image = img_tk
+                    # Continuar el bucle sin intentar capturar frames
+                    pantalla.after(100, scanning_loop)
+                return
+            
+            # Intentar reconectar
+            cap = cv2.VideoCapture(CAMERA_INDEX)
+            if cap.isOpened():
+                logger.info("Cámara reconectada exitosamente.")
+                camera_retries = 0  # Reiniciar contador de reintentos si tuvimos éxito
+            else:
+                camera_retries += 1
+                logger.warning(f"Reintento {camera_retries}/{MAX_CAMERA_RETRIES} fallido. Esperando antes de volver a intentar...")
+                time.sleep(1.0)  # Esperar antes de reintentar
+                pantalla.after(100, scanning_loop)
+                return
+        except Exception as e:
+            camera_retries += 1
+            logger.error(f"Error al reconectar cámara: {e}. Reintento {camera_retries}/{MAX_CAMERA_RETRIES}")
+            time.sleep(1.0)
+            if pantalla:
+                pantalla.after(100, scanning_loop)
+            return
     
     # Capturar frame de la cámara
     ret, frame = cap.read()
     if not ret:
         logger.error("No se pudo capturar frame de la cámara.")
+        camera_retries += 1
+        if camera_retries >= MAX_CAMERA_RETRIES:
+            logger.critical(f"Se alcanzó el máximo de {MAX_CAMERA_RETRIES} reintentos de captura de frame. Reconectando cámara...")
+            # Resetear la cámara
+            try:
+                if cap is not None:
+                    cap.release()
+                cap = None  # Forzar reconexión en la próxima iteración
+            except Exception as e:
+                logger.error(f"Error al liberar cámara para reconexión: {e}")
+        
         time.sleep(0.5)
-        pantalla.after(50, scanning_loop)
+        if pantalla:
+            pantalla.after(50, scanning_loop)
         return
+    
+    # Resetear contador de reintentos si llegamos aquí (captura exitosa)
+    camera_retries = 0
     
     # Añadir frame al buffer para procesamiento en segundo plano
     frame_processor.add_frame(frame)
@@ -675,48 +750,37 @@ def scanning_loop():
     # Preparar frame para mostrar (sin anotaciones de detección)
     display_frame = frame.copy()
     
-    # Si hay un resultado de detección reciente, dibujarlo en el frame
-    best_detection = None
+    # Usar las detecciones procesadas anteriormente en lugar de hacer re-inferencia
     if frame_processor.last_processed_frame is not None:
-        # Buscar detección en el último frame procesado
-        best_detection = None
-        results = model(frame_processor.last_processed_frame, stream=True, verbose=False)
-        for res in results:
-            boxes = res.boxes
-            for box in boxes:
-                conf = float(box.conf[0])
-                if conf >= MIN_CONFIDENCE:
-                    cls_index = int(box.cls[0])
-                    if 0 <= cls_index < NUM_CLASSES:
-                        if best_detection is None or conf > best_detection['conf']:
-                            best_detection = {
-                                'box': list(map(int, box.xyxy[0])),
-                                'conf': conf,
-                                'cls_index': cls_index,
-                                'cls_name': CLASS_NAMES[cls_index]
-                            }
-    
-    # Dibujar bounding box si hay detección
-    if best_detection:
-        b_box = best_detection['box']
-        conf = best_detection['conf']
-        cls_name = best_detection['cls_name']
+        # Obtener todas las detecciones ya procesadas
+        all_detections = frame_processor.last_detections
         
-        x1, y1, x2, y2 = [max(0, coord) for coord in b_box]
-        
-        # Convertir a RGB para Tkinter/PIL
-        display_frame = cv2.cvtColor(display_frame, cv2.COLOR_BGR2RGB)
-        
-        # Dibujar bounding box y texto
-        label_text = f'{cls_name} {conf:.2f}'
-        color = (0, 255, 0)  # Verde
-        cv2.rectangle(display_frame, (x1, y1), (x2, y2), color, 2)
-        (w, h), baseline = cv2.getTextSize(label_text, cv2.FONT_HERSHEY_SIMPLEX, 0.6, 2)
-        cv2.rectangle(display_frame, (x1, y1 - h - baseline - 5), (x1 + w, y1), (0,0,0), -1)
-        cv2.putText(display_frame, label_text, (x1, y1 - baseline - 2), 
-                  cv2.FONT_HERSHEY_SIMPLEX, 0.6, color, 2)
+        # Dibujar bounding boxes en el frame
+        if all_detections:
+            # Convertir a RGB para Tkinter/PIL
+            display_frame = cv2.cvtColor(display_frame, cv2.COLOR_BGR2RGB)
+            
+            # Dibujar cada detección
+            for detection in all_detections:
+                b_box = detection['box']
+                conf = detection['conf']
+                cls_name = detection['cls_name']
+                
+                x1, y1, x2, y2 = [max(0, coord) for coord in b_box]
+                
+                # Dibujar bounding box y texto
+                label_text = f'{cls_name} {conf:.2f}'
+                color = (0, 255, 0)  # Verde
+                cv2.rectangle(display_frame, (x1, y1), (x2, y2), color, 2)
+                (w, h), baseline = cv2.getTextSize(label_text, cv2.FONT_HERSHEY_SIMPLEX, 0.6, 2)
+                cv2.rectangle(display_frame, (x1, y1 - h - baseline - 5), (x1 + w, y1), (0,0,0), -1)
+                cv2.putText(display_frame, label_text, (x1, y1 - baseline - 2), 
+                          cv2.FONT_HERSHEY_SIMPLEX, 0.6, color, 2)
+        else:
+            # Convertir a RGB para Tkinter/PIL
+            display_frame = cv2.cvtColor(display_frame, cv2.COLOR_BGR2RGB)
     else:
-        # Convertir a RGB para Tkinter/PIL
+        # Si no hay frame procesado aún, solo convertir a RGB
         display_frame = cv2.cvtColor(display_frame, cv2.COLOR_BGR2RGB)
     
     # Actualizar el frame en la GUI
@@ -734,16 +798,412 @@ def scanning_loop():
     if pantalla:
         pantalla.after(20, scanning_loop)
 
+# --- Encapsular GUI en una clase ---
+class AppGUI:
+    """Clase que encapsula la interfaz gráfica de usuario para reducir el uso de variables globales."""
+    
+    def __init__(self, parent, config):
+        """
+        Inicializa la interfaz gráfica de usuario.
+        
+        Args:
+            parent: Ventana raíz de Tkinter
+            config: Objeto de configuración
+        """
+        self.parent = parent
+        self.config = config
+        
+        # Elementos de la GUI
+        self.lblVideo = None
+        self.lblImgExample = None
+        self.lblTxtExample = None
+        self.lblMotorStatus = None
+        self.lblFPS = None
+        self.lblTotalCount = None
+        self.class_count_labels = {}
+        self.bin_level_labels = {}
+        
+        # Rutas a recursos gráficos desde config
+        self.ui_assets_path = config.get('ui_assets.base_path', "ui_assets/")
+        self.background_img_path = config.get('ui_assets.background', self.ui_assets_path + "Canva.png")
+        self.example_img_paths = config.get('ui_assets.example_images', {
+            'Metal': self.ui_assets_path + "metal.png",
+            'Glass': self.ui_assets_path + "vidrio.png",
+            'Plastic': self.ui_assets_path + "plastico.png",
+            'Carton': self.ui_assets_path + "carton.png",
+        })
+        self.example_txt_paths = config.get('ui_assets.example_texts', {
+            'Metal': self.ui_assets_path + "metaltxt.png",
+            'Glass': self.ui_assets_path + "vidriotxt.png",
+            'Plastic': self.ui_assets_path + "plasticotxt.png",
+            'Carton': self.ui_assets_path + "cartontxt.png",
+        })
+        
+        # Imágenes de ejemplo precargadas
+        self.example_images = {}
+        self.example_texts = {}
+        
+        # Setup inicial de la GUI
+        self._setup_window()
+        self._load_ui_assets()
+        
+    def _setup_window(self):
+        """Configura la ventana principal de la aplicación."""
+        # Configurar ventana principal
+        window_title = self.config.get('window_title', "Cesto Inteligente")
+        window_geometry = self.config.get('window_geometry', "1280x720")
+        
+        self.parent.title(window_title)
+        self.parent.geometry(window_geometry)
+        self.parent.resizable(False, False)  # Evitar redimensionamiento
+        
+        # Cargar y poner imagen de fondo
+        try:
+            bg_image = tk.PhotoImage(file=self.background_img_path)
+            background_label = Label(self.parent, image=bg_image)
+            background_label.place(x=0, y=0, relwidth=1, relheight=1)
+            # Guardar referencia para evitar garbage collection
+            self.parent.bg_image_ref = bg_image
+        except Exception as e:
+            logger.warning(f"ADVERTENCIA: No se pudo cargar la imagen de fondo '{self.background_img_path}': {e}")
+        
+        # Crear Labels para Video y Ejemplos
+        self.lblVideo = Label(self.parent)
+        self.lblVideo.place(x=320, y=180)  # Ajustar posición según tu fondo
+        
+        self.lblImgExample = Label(self.parent)  # Label para imagen de ejemplo
+        self.lblImgExample.place(x=75, y=260)  # Ajustar posición
+        
+        self.lblTxtExample = Label(self.parent)  # Label para texto de ejemplo
+        self.lblTxtExample.place(x=995, y=310)  # Ajustar posición
+        
+        # Crear paneles adicionales
+        self.create_config_panel()
+        self.create_status_panel()
+    
+    def _load_ui_assets(self):
+        """Carga las imágenes de ejemplo desde las rutas especificadas."""
+        logger.info("INFO: Cargando imágenes de ejemplo para la GUI...")
+        for name, path in self.example_img_paths.items():
+            try:
+                img = cv2.imread(path)
+                if img is not None:
+                    self.example_images[name] = img
+                else:
+                    logger.warning(f"ADVERTENCIA: No se pudo cargar la imagen de ejemplo: {path}")
+            except Exception as e:
+                logger.error(f"ERROR: Cargando imagen {path}: {e}")
+        
+        for name, path in self.example_txt_paths.items():
+            try:
+                img = cv2.imread(path)
+                if img is not None:
+                    self.example_texts[name] = img
+                else:
+                    logger.warning(f"ADVERTENCIA: No se pudo cargar el texto de ejemplo: {path}")
+            except Exception as e:
+                logger.error(f"ERROR: Cargando texto {path}: {e}")
+        logger.info("INFO: Carga de imágenes de ejemplo finalizada.")
+    
+    def display_example_images(self, class_name):
+        """Muestra la imagen y texto de ejemplo para la clase dada."""
+        img_to_show = self.example_images.get(class_name)
+        txt_to_show = self.example_texts.get(class_name)
+        
+        # Mostrar imagen de ejemplo
+        if img_to_show is not None and self.lblImgExample:
+            try:
+                img_rgb = cv2.cvtColor(img_to_show, cv2.COLOR_BGR2RGB)
+                img_pil = Image.fromarray(img_rgb)
+                img_tk = ImageTk.PhotoImage(image=img_pil)
+                self.lblImgExample.configure(image=img_tk)
+                self.lblImgExample.image = img_tk  # Guardar referencia
+            except Exception as e:
+                logger.error(f"ERROR: Mostrando imagen de ejemplo para {class_name}: {e}")
+        elif self.lblImgExample:
+            self.lblImgExample.configure(image='')  # Limpiar si no hay imagen
+        
+        # Mostrar texto de ejemplo
+        if txt_to_show is not None and self.lblTxtExample:
+            try:
+                txt_rgb = cv2.cvtColor(txt_to_show, cv2.COLOR_BGR2RGB)
+                txt_pil = Image.fromarray(txt_rgb)
+                txt_tk = ImageTk.PhotoImage(image=txt_pil)
+                self.lblTxtExample.configure(image=txt_tk)
+                self.lblTxtExample.image = txt_tk  # Guardar referencia
+            except Exception as e:
+                logger.error(f"ERROR: Mostrando texto de ejemplo para {class_name}: {e}")
+        elif self.lblTxtExample:
+            self.lblTxtExample.configure(image='')  # Limpiar si no hay texto
+    
+    def clear_example_images(self):
+        """Limpia las etiquetas de imágenes de ejemplo en la GUI."""
+        if self.lblImgExample:
+            self.lblImgExample.configure(image='')
+            self.lblImgExample.image = None
+        if self.lblTxtExample:
+            self.lblTxtExample.configure(image='')
+            self.lblTxtExample.image = None
+    
+    def update_status_indicators(self, processing_stats, motor_busy, sensor_monitoring_active=False):
+        """Actualiza los indicadores de estado en la interfaz de usuario."""
+        # Actualizar indicador de estado del motor
+        if self.lblMotorStatus:
+            if motor_busy:
+                self.lblMotorStatus.config(text="MOTOR: OCUPADO", fg="red", bg="#ffcccc")
+            else:
+                self.lblMotorStatus.config(text="MOTOR: LISTO", fg="green", bg="#ccffcc")
+        
+        # Actualizar contador de FPS
+        if self.lblFPS:
+            self.lblFPS.config(text=f"FPS: {processing_stats['fps']:.1f}")
+        
+        # Actualizar contador total
+        if self.lblTotalCount:
+            self.lblTotalCount.config(text=f"Total Clasificados: {processing_stats['total_detections']}")
+        
+        # Actualizar contadores por clase
+        for class_name, label in self.class_count_labels.items():
+            count = processing_stats['detection_counts'].get(class_name, 0)
+            label.config(text=f"{class_name}: {count}")
+        
+        # Actualizar indicadores de nivel de llenado (si existen)
+        if self.bin_level_labels and sensor_monitoring_active:
+            try:
+                # Obtener los niveles actuales (lectura única)
+                bin_levels = sensor_controller.get_fill_levels(use_average=True, num_readings=1)
+                
+                # Actualizar cada etiqueta de nivel
+                for bin_name, level in bin_levels.items():
+                    if level is not None:
+                        # Determinar color según nivel de llenado
+                        if level > 80:
+                            color = "#ff4444"  # Rojo (casi lleno)
+                        elif level > 50:
+                            color = "#ffaa44"  # Naranja (medio)
+                        else:
+                            color = "#44aa44"  # Verde (vacío)
+                        
+                        label = self.bin_level_labels[bin_name]
+                        label.config(text=f"Nivel: {level:.1f}%", fg=color)
+                    else:
+                        label.config(text="Nivel: Error", fg="gray")
+            except Exception as e:
+                logger.error(f"Error al actualizar niveles de llenado: {e}")
+    
+    def create_status_panel(self):
+        """Crea un panel de estado para mostrar información en tiempo real."""
+        # Panel principal para estadísticas
+        stats_frame = Frame(self.parent, bg='#f0f0f0', padx=10, pady=10, relief="ridge", bd=2)
+        stats_frame.place(x=10, y=170, width=300, height=380)  # Aumentar altura para acomodar nuevos indicadores
+        
+        # Título del panel
+        title_label = Label(stats_frame, text="ESTADO DEL SISTEMA", 
+                            font=("Arial", 12, "bold"), bg='#f0f0f0')
+        title_label.grid(row=0, column=0, columnspan=2, pady=5)
+        
+        # Indicador de estado del motor
+        self.lblMotorStatus = Label(stats_frame, text="MOTOR: LISTO", 
+                                   font=("Arial", 10, "bold"), fg="green", bg="#ccffcc",
+                                   width=20, height=2)
+        self.lblMotorStatus.grid(row=1, column=0, columnspan=2, pady=10, padx=5)
+        
+        # Indicador de FPS
+        self.lblFPS = Label(stats_frame, text="FPS: 0.0", font=("Arial", 10), bg='#f0f0f0')
+        self.lblFPS.grid(row=2, column=0, columnspan=2, pady=5, sticky='w')
+        
+        # Contador total
+        self.lblTotalCount = Label(stats_frame, text="Total Clasificados: 0", 
+                                  font=("Arial", 10, "bold"), bg='#f0f0f0')
+        self.lblTotalCount.grid(row=3, column=0, columnspan=2, pady=5, sticky='w')
+        
+        # Línea separadora
+        separator = Frame(stats_frame, height=2, bg="gray")
+        separator.grid(row=4, column=0, columnspan=2, sticky='ew', pady=8)
+        
+        # Contadores por clase
+        self.class_count_labels = {}
+        
+        class_counter_title = Label(stats_frame, text="OBJETOS CLASIFICADOS", 
+                                   font=("Arial", 10, "bold"), bg='#f0f0f0')
+        class_counter_title.grid(row=5, column=0, columnspan=2, pady=5)
+        
+        for i, class_name in enumerate(CLASS_NAMES):
+            count_label = Label(stats_frame, text=f"{class_name}: 0", 
+                                font=("Arial", 9), bg='#f0f0f0')
+            count_label.grid(row=6+i, column=0, columnspan=2, sticky='w', pady=2)
+            self.class_count_labels[class_name] = count_label
+        
+        # Botón para reiniciar contadores
+        reset_button = Button(
+            stats_frame,
+            text="Reiniciar Contadores",
+            command=self.reset_counters
+        )
+        reset_button.grid(row=6+len(CLASS_NAMES), column=0, columnspan=2, pady=10)
+        
+        # Línea separadora para sección de niveles
+        separator2 = Frame(stats_frame, height=2, bg="gray")
+        separator2.grid(row=7+len(CLASS_NAMES), column=0, columnspan=2, sticky='ew', pady=8)
+        
+        # Sección para indicadores de nivel de llenado
+        bin_level_title = Label(stats_frame, text="NIVEL DE LLENADO", 
+                             font=("Arial", 10, "bold"), bg='#f0f0f0')
+        bin_level_title.grid(row=8+len(CLASS_NAMES), column=0, columnspan=2, pady=5)
+        
+        # Crear indicadores de nivel para cada compartimento
+        self.bin_level_labels = {}
+        for i, class_name in enumerate(CLASS_NAMES):
+            level_label = Label(stats_frame, text=f"Nivel: --", 
+                             font=("Arial", 9), bg='#f0f0f0', fg="gray")
+            level_label.grid(row=9+len(CLASS_NAMES)+i, column=0, columnspan=2, sticky='w', pady=2)
+            self.bin_level_labels[class_name] = level_label
+        
+        return stats_frame
+    
+    def reset_counters(self):
+        """Reinicia los contadores de detecciones."""
+        global processing_stats  # Usar la variable global hasta refactor completo
+        processing_stats['detection_counts'] = {class_name: 0 for class_name in CLASS_NAMES}
+        processing_stats['total_detections'] = 0
+        self.update_status_indicators(processing_stats, motor_busy, sensor_monitoring_active)
+        logger.info("Contadores reiniciados")
+    
+    def create_config_panel(self):
+        """Crea un panel de configuración para ajustar parámetros en tiempo real."""
+        global DROP_DELAY, MIN_CONFIDENCE  # Usar variables globales hasta refactor completo
+        
+        config_frame = Frame(self.parent, bg='#f0f0f0', padx=10, pady=10)
+        config_frame.place(x=10, y=10, width=300, height=150)
+        
+        # Configuración de DROP_DELAY
+        drop_delay_label = Label(config_frame, text="Tiempo de Caída (s):", bg='#f0f0f0')
+        drop_delay_label.grid(row=0, column=0, sticky='w', pady=5)
+        
+        drop_delay_var = tk.DoubleVar(value=DROP_DELAY)
+        drop_delay_scale = Scale(
+            config_frame, 
+            from_=0.5, 
+            to=5.0, 
+            resolution=0.1, 
+            orient=HORIZONTAL, 
+            variable=drop_delay_var,
+            command=self.update_drop_delay
+        )
+        drop_delay_scale.grid(row=0, column=1, pady=5, padx=5)
+        
+        # Configuración de MIN_CONFIDENCE
+        conf_label = Label(config_frame, text="Umbral de Confianza:", bg='#f0f0f0')
+        conf_label.grid(row=1, column=0, sticky='w', pady=5)
+        
+        conf_var = tk.DoubleVar(value=MIN_CONFIDENCE)
+        conf_scale = Scale(
+            config_frame, 
+            from_=0.1, 
+            to=1.0, 
+            resolution=0.05, 
+            orient=HORIZONTAL, 
+            variable=conf_var,
+            command=self.update_confidence
+        )
+        conf_scale.grid(row=1, column=1, pady=5, padx=5)
+        
+        # Botón para guardar configuración
+        save_button = Button(
+            config_frame,
+            text="Guardar Configuración",
+            command=self.save_current_config
+        )
+        save_button.grid(row=2, column=0, columnspan=2, pady=10)
+        
+        return config_frame
+    
+    def update_drop_delay(self, new_value):
+        """Actualiza el tiempo de caída en tiempo real."""
+        global DROP_DELAY
+        DROP_DELAY = float(new_value)
+        logger.info(f"Tiempo de caída actualizado a {DROP_DELAY} segundos")
+    
+    def update_confidence(self, new_value):
+        """Actualiza el umbral de confianza en tiempo real."""
+        global MIN_CONFIDENCE
+        MIN_CONFIDENCE = float(new_value)
+        logger.info(f"Umbral de confianza actualizado a {MIN_CONFIDENCE}")
+    
+    def save_current_config(self):
+        """Guarda la configuración actual al archivo."""
+        global config, DROP_DELAY, MIN_CONFIDENCE
+        config.set('drop_delay', DROP_DELAY)
+        config.set('min_confidence', MIN_CONFIDENCE)
+        config.save()
+        logger.info("Configuración guardada correctamente")
+    
+    def update_fill_indicators(self, levels):
+        """
+        Actualiza los indicadores visuales de nivel de llenado en la GUI.
+        
+        Args:
+            levels (dict): Diccionario con los niveles de llenado por compartimento
+        """
+        # Actualizar cada etiqueta con su nivel correspondiente
+        for bin_name, level in levels.items():
+            if bin_name in self.bin_level_labels:
+                label = self.bin_level_labels[bin_name]
+                
+                if level is not None:
+                    # Determinar color según nivel de llenado
+                    if level > 80:
+                        color = "#ff4444"  # Rojo (casi lleno)
+                    elif level > 50:
+                        color = "#ffaa44"  # Naranja (medio)
+                    else:
+                        color = "#44aa44"  # Verde (vacío)
+                    
+                    label.config(text=f"Nivel: {level:.1f}%", fg=color)
+                else:
+                    label.config(text="Nivel: Error", fg="gray")
+        
+        # Nuevo: Actualizar adaptador web con niveles de llenado
+        main_web_adapter.update_data(fill_levels=levels)
+    
+    def update_camera_frame(self, frame):
+        """Actualiza el frame de la cámara en la GUI."""
+        if self.lblVideo:
+            try:
+                frame_width = self.config.get('frame_width')
+                frame_resized = imutils.resize(frame, width=frame_width)
+                img_pil = Image.fromarray(frame_resized)
+                img_tk = ImageTk.PhotoImage(image=img_pil)
+                self.lblVideo.configure(image=img_tk)
+                self.lblVideo.image = img_tk
+            except Exception as e:
+                logger.error(f"Error actualizando frame en GUI: {e}")
+    
+    def show_error_frame(self, message="ERROR DE CAMARA"):
+        """Muestra un frame de error en la GUI."""
+        if self.lblVideo:
+            try:
+                error_img = np.zeros((300, 400, 3), dtype=np.uint8)
+                cv2.putText(error_img, message, (50, 150), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 255), 2)
+                img_rgb = cv2.cvtColor(error_img, cv2.COLOR_BGR2RGB)
+                img_pil = Image.fromarray(img_rgb)
+                img_tk = ImageTk.PhotoImage(image=img_pil)
+                self.lblVideo.configure(image=img_tk)
+                self.lblVideo.image = img_tk
+            except Exception as e:
+                logger.error(f"Error mostrando frame de error: {e}")
+
 # --- Función Principal de la Aplicación ---
 
 def main_app():
     """Inicializa la aplicación, carga recursos, configura la GUI y arranca el bucle."""
-    global cap, model, pantalla, lblVideo, lblImgExample, lblTxtExample
-    global motor_thread, frame_processor, sensor_monitoring_active
+    global cap, model, pantalla, frame_processor, sensor_monitoring_active
+    global motor_busy  # Motor sigue siendo global por ahora
     
     setup_successful = False # Flag para controlar limpieza de GPIO
     sensors_setup_successful = False # Flag para controlar limpieza de sensores
     pantalla = None # Asegurar que pantalla es None al inicio
+    gui = None  # La instancia de la clase GUI
 
     try:
         # --- 1. Inicializar GPIO para el Motor ---
@@ -765,31 +1225,8 @@ def main_app():
         # --- 2. Configurar Ventana Principal (GUI con Tkinter) ---
         logger.info("INFO: Creando ventana principal de la GUI...")
         pantalla = tk.Tk()
-        pantalla.title(WINDOW_TITLE)
-        pantalla.geometry(WINDOW_GEOMETRY)
-        pantalla.resizable(False, False) # Evitar redimensionamiento
-
-        # Cargar y poner imagen de fondo
-        try:
-            bg_image = tk.PhotoImage(file=BACKGROUND_IMG_PATH)
-            background_label = Label(pantalla, image=bg_image)
-            background_label.place(x=0, y=0, relwidth=1, relheight=1)
-            # Guardar referencia para evitar garbage collection
-            pantalla.bg_image_ref = bg_image
-        except Exception as e:
-            logger.warning(f"ADVERTENCIA: No se pudo cargar la imagen de fondo '{BACKGROUND_IMG_PATH}': {e}")
-            # Continuar sin fondo si falla
-
-        # Crear Labels para Video y Ejemplos (se llenarán en el bucle)
-        lblVideo = Label(pantalla)
-        lblVideo.place(x=320, y=180) # Ajustar posición según tu fondo
-
-        lblImgExample = Label(pantalla) # Label para imagen de ejemplo
-        lblImgExample.place(x=75, y=260) # Ajustar posición
-
-        lblTxtExample = Label(pantalla) # Label para texto de ejemplo
-        lblTxtExample.place(x=995, y=310) # Ajustar posición
-
+        # Inicializar la GUI encapsulada en la clase AppGUI
+        gui = AppGUI(pantalla, config)
         logger.info("INFO: GUI creada.")
 
         # --- 3. Cargar Modelo YOLO ---
@@ -802,34 +1239,246 @@ def main_app():
         except Exception as e:
             raise RuntimeError(f"Error CRÍTICO al cargar el modelo YOLO desde '{MODEL_PATH}': {e}")
 
-        # --- 4. Cargar Recursos Gráficos Adicionales ---
-        load_ui_assets() # Cargar imágenes de metal, vidrio, etc.
-
         # --- 5. Inicializar Cámara ---
         logger.info(f"INFO: Inicializando cámara (índice {CAMERA_INDEX})...")
         cap = cv2.VideoCapture(CAMERA_INDEX)
         if not cap.isOpened():
             raise IOError(f"Error CRÍTICO: No se puede abrir la cámara con índice {CAMERA_INDEX}. Verifica conexión y permisos.")
-        # Intentar establecer resolución (puede no funcionar en todas las cámaras)
-        # cap.set(cv2.CAP_PROP_FRAME_WIDTH, 1280)
-        # cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 720)
         logger.info("INFO: Cámara inicializada.")
 
-        # --- 6. Iniciar Bucle de Escaneo ---
+        # --- 6. Actualizar funciones para usar la GUI encapsulada ---
+        # Actualizar el callback de detección para usar la instancia gui
+        def adapted_detection_callback(best_detection, all_detections=None):
+            global last_detected_class_index, motor_busy
+            if best_detection:
+                cls_index = best_detection['cls_index']
+                cls_name = best_detection['cls_name']
+                
+                # Mostrar imagen de ejemplo usando la instancia gui
+                gui.display_example_images(cls_name)
+                
+                # Resto de la lógica igual
+                if not motor_busy and cls_index in TARGET_STEPS_MAP and cls_index != last_detected_class_index:
+                    motor_busy = True
+                    gui.update_status_indicators(processing_stats, motor_busy, sensor_monitoring_active)
+                    target_position = TARGET_STEPS_MAP[cls_index]
+                    logger.info(f"Detección válida: '{cls_name}'. Iniciando motor hacia {target_position} pasos.")
+                    
+                    # Actualizar contadores
+                    processing_stats['detection_counts'][cls_name] = processing_stats['detection_counts'].get(cls_name, 0) + 1
+                    processing_stats['total_detections'] += 1
+                    gui.update_status_indicators(processing_stats, motor_busy, sensor_monitoring_active)
+                    
+                    # Iniciar hilo del motor
+                    motor_thread = threading.Thread(
+                        target=_handle_motor_sequence,
+                        args=(target_position, cls_name),
+                        daemon=True
+                    )
+                    motor_thread.start()
+                    
+                    # Actualizar última clase
+                    last_detected_class_index = cls_index
+                    
+                    # Actualizar adaptador web
+                    detection_data = {
+                        'class_name': cls_name,
+                        'confidence': best_detection['conf']
+                    }
+                    main_web_adapter.update_data(detection=detection_data)
+            else:
+                # No hay detección, limpiar si no hay motor activo
+                if not motor_busy and last_detected_class_index != -1:
+                    last_detected_class_index = -1
+                    gui.clear_example_images()
+                    
+        # Actualizar el bucle de escaneo para usar la instancia gui
+        def adapted_scanning_loop():
+            global last_detected_class_index, motor_busy, cap, model
+            
+            # Variables de seguimiento para reintentos de cámara
+            MAX_CAMERA_RETRIES = 5
+            camera_retries = 0
+            
+            # Actualizar contador de frames y calcular FPS
+            processing_stats['frame_count'] += 1
+            current_time = time.time()
+            time_diff = current_time - processing_stats['last_fps_time']
+            
+            # Actualizar FPS cada segundo
+            if time_diff >= 1.0:
+                processing_stats['fps'] = processing_stats['frame_count'] / time_diff
+                processing_stats['last_fps_time'] = current_time
+                processing_stats['frame_count'] = 0
+                gui.update_status_indicators(processing_stats, motor_busy, sensor_monitoring_active)
+            
+            if cap is None or not cap.isOpened():
+                logger.error("Cámara no disponible o cerrada. Intentando reconectar...")
+                try:
+                    if cap is not None:
+                        cap.release()  # Liberar recursos antes de intentar reconectar
+                    
+                    # Verificar si excedimos el número máximo de reintentos
+                    if camera_retries >= MAX_CAMERA_RETRIES:
+                        logger.critical(f"Se alcanzó el máximo de {MAX_CAMERA_RETRIES} reintentos de reconexión de cámara. Deteniendo escaneo.")
+                        if pantalla:
+                            # Mostrar mensaje de error en la GUI
+                            gui.show_error_frame("ERROR DE CAMARA")
+                            # Continuar el bucle sin intentar capturar frames
+                            pantalla.after(100, adapted_scanning_loop)
+                        return
+                    
+                    # Intentar reconectar
+                    cap = cv2.VideoCapture(CAMERA_INDEX)
+                    if cap.isOpened():
+                        logger.info("Cámara reconectada exitosamente.")
+                        camera_retries = 0  # Reiniciar contador de reintentos si tuvimos éxito
+                    else:
+                        camera_retries += 1
+                        logger.warning(f"Reintento {camera_retries}/{MAX_CAMERA_RETRIES} fallido. Esperando antes de volver a intentar...")
+                        time.sleep(1.0)  # Esperar antes de reintentar
+                        pantalla.after(100, adapted_scanning_loop)
+                        return
+                except Exception as e:
+                    camera_retries += 1
+                    logger.error(f"Error al reconectar cámara: {e}. Reintento {camera_retries}/{MAX_CAMERA_RETRIES}")
+                    time.sleep(1.0)
+                    if pantalla:
+                        pantalla.after(100, adapted_scanning_loop)
+                    return
+            
+            # Capturar frame de la cámara
+            ret, frame = cap.read()
+            if not ret:
+                logger.error("No se pudo capturar frame de la cámara.")
+                camera_retries += 1
+                if camera_retries >= MAX_CAMERA_RETRIES:
+                    logger.critical(f"Se alcanzó el máximo de {MAX_CAMERA_RETRIES} reintentos de captura de frame. Reconectando cámara...")
+                    # Resetear la cámara
+                    try:
+                        if cap is not None:
+                            cap.release()
+                        cap = None  # Forzar reconexión en la próxima iteración
+                    except Exception as e:
+                        logger.error(f"Error al liberar cámara para reconexión: {e}")
+                
+                time.sleep(0.5)
+                if pantalla:
+                    pantalla.after(50, adapted_scanning_loop)
+                return
+            
+            # Resetear contador de reintentos si llegamos aquí (captura exitosa)
+            camera_retries = 0
+            
+            # Añadir frame al buffer para procesamiento en segundo plano
+            frame_processor.add_frame(frame)
+            
+            # Preparar frame para mostrar (sin anotaciones de detección)
+            display_frame = frame.copy()
+            
+            # Usar las detecciones procesadas anteriormente en lugar de hacer re-inferencia
+            if frame_processor.last_processed_frame is not None:
+                # Obtener todas las detecciones ya procesadas
+                all_detections = frame_processor.last_detections
+                
+                # Dibujar bounding boxes en el frame
+                if all_detections:
+                    # Convertir a RGB para Tkinter/PIL
+                    display_frame = cv2.cvtColor(display_frame, cv2.COLOR_BGR2RGB)
+                    
+                    # Dibujar cada detección
+                    for detection in all_detections:
+                        b_box = detection['box']
+                        conf = detection['conf']
+                        cls_name = detection['cls_name']
+                        
+                        x1, y1, x2, y2 = [max(0, coord) for coord in b_box]
+                        
+                        # Dibujar bounding box y texto
+                        label_text = f'{cls_name} {conf:.2f}'
+                        color = (0, 255, 0)  # Verde
+                        cv2.rectangle(display_frame, (x1, y1), (x2, y2), color, 2)
+                        (w, h), baseline = cv2.getTextSize(label_text, cv2.FONT_HERSHEY_SIMPLEX, 0.6, 2)
+                        cv2.rectangle(display_frame, (x1, y1 - h - baseline - 5), (x1 + w, y1), (0,0,0), -1)
+                        cv2.putText(display_frame, label_text, (x1, y1 - baseline - 2), 
+                                  cv2.FONT_HERSHEY_SIMPLEX, 0.6, color, 2)
+                else:
+                    # Convertir a RGB para Tkinter/PIL
+                    display_frame = cv2.cvtColor(display_frame, cv2.COLOR_BGR2RGB)
+            else:
+                # Si no hay frame procesado aún, solo convertir a RGB
+                display_frame = cv2.cvtColor(display_frame, cv2.COLOR_BGR2RGB)
+            
+            # Actualizar el frame en la GUI usando el método de la clase
+            gui.update_camera_frame(display_frame)
+            
+            # Programar la siguiente iteración
+            if pantalla:
+                pantalla.after(20, adapted_scanning_loop)
+        
+        # Modificar la función de control del motor para actualizar la GUI encapsulada
+        def adapted_handle_motor_sequence(target_position, class_name):
+            """
+            Ejecuta la secuencia completa del motor en un hilo dedicado.
+            Esto evita bloquear el hilo principal y la interfaz gráfica.
+            """
+            global motor_busy  # Necesitamos modificar la variable global
+
+            logger.info(f"THREAD: Iniciando secuencia de motor para '{class_name}' a {target_position} pasos.")
+            try:
+                # 1. Mover a la posición de la clase detectada
+                logger.info(f"THREAD: Moviendo a posición {target_position}...")
+                motor_controller.move_motor_to_position(target_position)
+                logger.info(f"THREAD: Motor en posición {target_position}.")
+
+                # 2. Esperar a que el objeto caiga
+                logger.info(f"THREAD: Esperando {DROP_DELAY:.1f} segundos para que caiga el objeto...")
+                time.sleep(DROP_DELAY)  # time.sleep() es seguro aquí (hilo separado)
+
+                # 3. Volver a la posición HOME (si es diferente)
+                if target_position != HOME_POSITION_STEPS:
+                    logger.info(f"THREAD: Volviendo a posición HOME ({HOME_POSITION_STEPS} pasos)...")
+                    motor_controller.move_motor_to_position(HOME_POSITION_STEPS)
+                    time.sleep(0.5)  # Pequeña pausa después de volver
+                    logger.info("THREAD: Motor en posición HOME.")
+                else:
+                    logger.info("THREAD: Ya estaba en posición HOME, no se requiere retorno.")
+
+                logger.info(f"THREAD: Secuencia de motor para '{class_name}' completada.")
+
+            except Exception as e:
+                logger.error(f"ERROR EN THREAD DEL MOTOR: {e}")
+                # Intentar volver a HOME si falla en medio del movimiento (opcional)
+                try:
+                     logger.info("THREAD: Intentando volver a HOME después de error...")
+                     motor_controller.move_motor_to_position(HOME_POSITION_STEPS)
+                except Exception as e2:
+                     logger.error(f"ERROR EN THREAD: No se pudo volver a HOME: {e2}")
+
+            finally:
+                # 4. ¡MUY IMPORTANTE! Liberar el flag para permitir nuevas detecciones.
+                logger.info("THREAD: Liberando bandera 'motor_busy'.")
+                motor_busy = False
+                # Usar after para actualizar la UI desde el hilo principal
+                if pantalla:
+                    pantalla.after(10, lambda: gui.update_status_indicators(processing_stats, motor_busy, sensor_monitoring_active))
+                
+        # Reemplazar la función original
+        global _handle_motor_sequence
+        _handle_motor_sequence = adapted_handle_motor_sequence
+
+        # --- 6. Iniciar Bucle de Escaneo con la versión adaptada ---
+        logger.info("INFO: Iniciando procesador de frames...")
+        frame_processor.start_processing(model, MIN_CONFIDENCE, adapted_detection_callback)
+        
         logger.info("INFO: Iniciando bucle principal de escaneo y detección...")
-        scanning_loop()
-
-        # Crear panel de configuración
-        config_panel = create_config_panel(pantalla)
-
-        # Crear panel de estado
-        status_panel = create_status_panel(pantalla)
+        adapted_scanning_loop()
 
         # --- 7. Iniciar monitoreo de niveles de llenado ---
         if sensors_setup_successful:
             logger.info("INFO: Iniciando monitoreo de niveles de llenado...")
             sensor_monitoring_active = sensor_controller.start_continuous_monitoring(
-                callback=update_fill_indicators,
+                callback=gui.update_fill_indicators,
                 interval=10.0  # Actualizar cada 10 segundos
             )
             if sensor_monitoring_active:
@@ -880,6 +1529,15 @@ def main_app():
             sensor_controller.cleanup_sensors()
         except Exception as sensor_e:
             logger.error(f"ERROR: Durante la limpieza de sensores: {sensor_e}")
+        
+        # Liberar la cámara
+        try:
+            if cap is not None:
+                logger.info("INFO: Liberando recursos de cámara...")
+                cap.release()
+                logger.info("INFO: Cámara liberada correctamente.")
+        except Exception as cam_e:
+            logger.error(f"ERROR: Durante la liberación de la cámara: {cam_e}")
 
         # Nuevo: Detener el servidor web adapter
         logger.info("Deteniendo servidor web adapter...")
@@ -887,103 +1545,6 @@ def main_app():
         logger.info("Servidor web adapter detenido")
 
         logger.info("INFO: Aplicación cerrada.")
-
-# --- Agregar a la interfaz un panel de configuración ---
-def create_config_panel(parent):
-    """Crea un panel de configuración para ajustar parámetros en tiempo real."""
-    config_frame = Frame(parent, bg='#f0f0f0', padx=10, pady=10)
-    config_frame.place(x=10, y=10, width=300, height=150)
-    
-    # Configuración de DROP_DELAY
-    drop_delay_label = Label(config_frame, text="Tiempo de Caída (s):", bg='#f0f0f0')
-    drop_delay_label.grid(row=0, column=0, sticky='w', pady=5)
-    
-    drop_delay_var = tk.DoubleVar(value=DROP_DELAY)
-    drop_delay_scale = Scale(
-        config_frame, 
-        from_=0.5, 
-        to=5.0, 
-        resolution=0.1, 
-        orient=HORIZONTAL, 
-        variable=drop_delay_var,
-        command=lambda val: update_drop_delay(float(val))
-    )
-    drop_delay_scale.grid(row=0, column=1, pady=5, padx=5)
-    
-    # Configuración de MIN_CONFIDENCE
-    conf_label = Label(config_frame, text="Umbral de Confianza:", bg='#f0f0f0')
-    conf_label.grid(row=1, column=0, sticky='w', pady=5)
-    
-    conf_var = tk.DoubleVar(value=MIN_CONFIDENCE)
-    conf_scale = Scale(
-        config_frame, 
-        from_=0.1, 
-        to=1.0, 
-        resolution=0.05, 
-        orient=HORIZONTAL, 
-        variable=conf_var,
-        command=lambda val: update_confidence(float(val))
-    )
-    conf_scale.grid(row=1, column=1, pady=5, padx=5)
-    
-    # Botón para guardar configuración
-    save_button = Button(
-        config_frame,
-        text="Guardar Configuración",
-        command=save_current_config
-    )
-    save_button.grid(row=2, column=0, columnspan=2, pady=10)
-    
-    return config_frame
-
-def update_drop_delay(new_value):
-    """Actualiza el tiempo de caída en tiempo real."""
-    global DROP_DELAY
-    DROP_DELAY = new_value
-    logger.info(f"Tiempo de caída actualizado a {DROP_DELAY} segundos")
-    
-def update_confidence(new_value):
-    """Actualiza el umbral de confianza en tiempo real."""
-    global MIN_CONFIDENCE
-    MIN_CONFIDENCE = new_value
-    logger.info(f"Umbral de confianza actualizado a {MIN_CONFIDENCE}")
-    
-def save_current_config():
-    """Guarda la configuración actual al archivo."""
-    config.set('drop_delay', DROP_DELAY)
-    config.set('min_confidence', MIN_CONFIDENCE)
-    config.save()
-    logger.info("Configuración guardada correctamente")
-
-def update_fill_indicators(levels):
-    """
-    Actualiza los indicadores visuales de nivel de llenado en la GUI.
-    
-    Args:
-        levels (dict): Diccionario con los niveles de llenado por compartimento
-    """
-    global bin_level_labels
-    
-    # Actualizar cada etiqueta con su nivel correspondiente
-    for bin_name, level in levels.items():
-        if bin_name in bin_level_labels:
-            label = bin_level_labels[bin_name]
-            
-            if level is not None:
-                # Determinar color según nivel de llenado
-                if level > 80:
-                    color = "#ff4444"  # Rojo (casi lleno)
-                elif level > 50:
-                    color = "#ffaa44"  # Naranja (medio)
-                else:
-                    color = "#44aa44"  # Verde (vacío)
-                
-                label.config(text=f"Nivel: {level:.1f}%", fg=color)
-            else:
-                label.config(text="Nivel: Error", fg="gray")
-
-    # Nuevo: Actualizar adaptador web con niveles de llenado
-    main_web_adapter.update_data(fill_levels=levels)
 
 # --- Punto de Entrada Principal ---
 if __name__ == "__main__":

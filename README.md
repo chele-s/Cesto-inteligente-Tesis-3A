@@ -1,6 +1,6 @@
 # Cesto Inteligente: Clasificación Automatizada de Desechos con IA
 
-![Project Demo](ui_assets/Canva.png) ## Descripción General
+![Project Demo](ui_assets/Esqueleto cesto inteligente.png) ## Descripción General
 
 Este proyecto implementa un cesto de basura inteligente capaz de clasificar automáticamente los desechos en tiempo real. Utiliza una **Raspberry Pi 4 B+**, una cámara, y un modelo de **Inteligencia Artificial (YOLOv8)** para identificar cuatro categorías de residuos: **Metal, Vidrio, Plástico y Cartón**. Una vez clasificado, un mecanismo accionado por **motores paso a paso** (controlados por drivers **A4988**) dirige el residuo al compartimento correspondiente dentro del cesto. El sistema cuenta con una interfaz gráfica de usuario (GUI) desarrollada con Tkinter para visualizar el proceso.
 
@@ -198,7 +198,7 @@ Cesto_Inteligente_Proyecto/
 
 ## Licencia
 
-Este proyecto se distribuye bajo la Licencia MIT. Ver el archivo `LICENSE` para más detalles (si decides añadir uno).
+Este proyecto se distribuye bajo la Licencia MIT. Ver el archivo `LICENSE` para más detalles.
 
 ## Agradecimientos
 
