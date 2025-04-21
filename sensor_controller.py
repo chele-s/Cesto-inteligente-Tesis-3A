@@ -44,6 +44,8 @@ readings_per_measurement = DEFAULT_READINGS_PER_MEASUREMENT
 is_monitoring = False
 monitoring_thread = None
 fill_level_cache = {}  # Caché de las últimas mediciones
+use_temperature_compensation = False
+current_temperature = 20.0  # Temperatura por defecto en grados Celsius
 
 # --- Funciones de Configuración ---
 
@@ -57,7 +59,7 @@ def load_config(config_file='config.json'):
     Returns:
         bool: True si la configuración se cargó correctamente, False en caso contrario.
     """
-    global sensor_pins, bin_depth_cm, sound_speed, readings_per_measurement
+    global sensor_pins, bin_depth_cm, sound_speed, readings_per_measurement, use_temperature_compensation, current_temperature
     
     try:
         if not os.path.exists(config_file):
@@ -81,8 +83,20 @@ def load_config(config_file='config.json'):
                 
             if 'readings_per_measurement' in sensor_config:
                 readings_per_measurement = int(sensor_config['readings_per_measurement'])
+            
+            if 'use_temperature_compensation' in sensor_config:
+                use_temperature_compensation = bool(sensor_config['use_temperature_compensation'])
+                
+            if 'default_temperature_c' in sensor_config:
+                current_temperature = float(sensor_config['default_temperature_c'])
+                if use_temperature_compensation:
+                    # Actualizar velocidad del sonido basado en la temperatura
+                    sound_speed = calculate_sound_speed(current_temperature)
                 
         logger.info(f"Configuración cargada desde {config_file}")
+        logger.info(f"Usando compensación de temperatura: {use_temperature_compensation}")
+        if use_temperature_compensation:
+            logger.info(f"Temperatura: {current_temperature}°C, Velocidad del sonido: {sound_speed} cm/s")
         return True
         
     except Exception as e:
@@ -102,6 +116,27 @@ def calculate_sound_speed(temperature_c=20):
     # Fórmula para velocidad del sonido en función de la temperatura (aproximación)
     # v = 331.3 + 0.606 * T (m/s) -> convertida a cm/s
     return (331.3 + 0.606 * temperature_c) * 100
+
+def set_temperature(temperature_c):
+    """
+    Actualiza la temperatura ambiente y recalcula la velocidad del sonido.
+    
+    Args:
+        temperature_c (float): Temperatura en grados Celsius.
+    
+    Returns:
+        float: Nueva velocidad del sonido calculada.
+    """
+    global current_temperature, sound_speed, use_temperature_compensation
+    
+    if not use_temperature_compensation:
+        logger.debug("Compensación de temperatura desactivada, ignorando cambio de temperatura.")
+        return sound_speed
+        
+    current_temperature = temperature_c
+    sound_speed = calculate_sound_speed(temperature_c)
+    logger.info(f"Temperatura actualizada a {temperature_c}°C, nueva velocidad del sonido: {sound_speed} cm/s")
+    return sound_speed
 
 def setup_sensors(force_mode=False):
     """
@@ -395,21 +430,30 @@ def cleanup_sensors():
 if __name__ == '__main__':
     # Configurar logging
     logging.basicConfig(
-        level=logging.DEBUG,
+        level=logging.INFO,
         format='%(asctime)s - %(levelname)s - %(message)s',
         datefmt='%Y-%m-%d %H:%M:%S'
     )
     
-    # Función de ejemplo para callback de monitoreo
     def print_levels(levels):
-        print("\nNiveles de llenado actuales:")
-        for bin_name, level in levels.items():
-            status = f"{level:.1f}%" if level is not None else "ERROR"
-            print(f"  • {bin_name}: {status}")
+        """Imprime los niveles de llenado en formato legible."""
+        for name, percentage in levels.items():
+            print(f"{name}: {percentage:.1f}% lleno")
     
     # Probar configuración y medición
     print("=== Iniciando prueba de sensores ultrasónicos ===")
     try:
+        # Cargar configuración si existe
+        load_config()
+        
+        # Probar efecto de la temperatura
+        if use_temperature_compensation:
+            print(f"\nPrueba de compensación de temperatura:")
+            print(f"Temperatura actual: {current_temperature}°C, velocidad del sonido: {sound_speed} cm/s")
+            for test_temp in [10, 15, 20, 25, 30]:
+                new_speed = set_temperature(test_temp)
+                print(f"A {test_temp}°C -> Velocidad del sonido: {new_speed} cm/s")
+        
         if setup_sensors():
             # Modo de prueba 1: Lectura única
             print("\n--- Modo de prueba 1: Lectura única ---")

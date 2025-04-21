@@ -1,0 +1,663 @@
+@import url('https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap');
+
+:root {
+  /* Inspired by animejs site - Dark Theme */
+  --primary-color: #e0e0e0; /* Light grey for primary text */
+  --secondary-color: #00ff9b; /* Vibrant green accent */
+  --accent-red: #ff4d4d;
+  --accent-yellow: #ffee80;
+  --accent-blue: #3498db; /* Keep existing blue for some elements */
+
+  --metal-color: #95a5a6; /* Muted grey for metal */
+  --glass-color: #a1ded0; /* Keep existing */
+  --plastic-color: #fdcb6e; /* Keep existing */
+  --carton-color: #e17055; /* Keep existing */
+
+  --text-color: var(--primary-color);
+  --background-color: #121212; /* Very dark grey/black */
+  --card-bg: #1e1e1e; /* Slightly lighter dark for containers */
+  --border-color: rgba(255, 255, 255, 0.1); /* Subtle borders */
+  --shadow: 0 5px 15px rgba(0, 0, 0, 0.2);
+  --transition: all 0.3s ease;
+}
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+body {
+  font-family: 'Poppins', sans-serif;
+  background-color: var(--background-color);
+  color: var(--text-color);
+  overflow-x: hidden;
+  transition: var(--transition);
+  line-height: 1.6; /* Improve readability */
+}
+
+.dashboard {
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+  padding: 30px; /* Increase padding */
+  max-width: 1200px; /* Add max-width for larger screens */
+  margin: 0 auto; /* Center dashboard */
+}
+
+.header {
+  text-align: center;
+  margin-bottom: 30px;
+  opacity: 0;
+}
+
+.header h1 {
+  font-size: 2.5rem;
+  margin-bottom: 10px;
+  font-weight: 700;
+}
+
+.header p {
+  font-size: 1.2rem;
+  opacity: 0.8;
+}
+
+.container {
+  display: grid;
+  /* grid-template-columns: 1fr; */ /* Default to single column */
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 450px), 1fr)); /* Responsive columns */
+  gap: 40px; /* Increase gap */
+  margin-bottom: 40px;
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 0 20px;
+}
+
+/* Styles for the new sections */
+.dashboard-section {
+  background-color: var(--card-bg);
+  padding: 25px;
+  border-radius: 10px;
+  margin-bottom: 20px; /* Reduced margin (This should now take effect) */
+  box-shadow: 0 5px 20px rgba(0, 0, 0, 0.2); /* Enhanced shadow */
+  border: 1px solid var(--border-color);
+  transition: var(--transition), transform 0.3s ease;
+  position: relative;
+  /* margin-bottom: 100px; */ /* REMOVED: This caused excessive spacing */
+  /* Base styles are now set by JS/anime.js */
+  /* opacity: 0; */
+  /* transform: translateY(30px); */
+  /* transition: opacity 0.6s ease-out, transform 0.6s ease-out; */ /* Removed CSS transition for animation */
+}
+
+.dashboard-section:hover {
+  transform: translateY(-5px);
+}
+
+.card-title {
+  font-size: 1.4rem;
+  font-weight: 600;
+  margin-bottom: 25px; /* Increased further */
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  color: var(--secondary-color); /* Use accent for titles */
+}
+
+.card-title i {
+  font-size: 1.5rem;
+  color: var(--secondary-color);
+}
+
+/* Fill Levels Section */
+.bins-container {
+  display: flex;
+  justify-content: space-between;
+  height: 250px;
+  align-items: flex-end;
+  /* margin-top: 20px; */
+  margin-top: 30px; /* Increased margin-top to push bins down from title */
+}
+
+.bin {
+  width: 22%;
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.bin-icon {
+  font-size: 2rem;
+  margin-bottom: 10px;
+}
+
+.bin-container {
+  width: 100%;
+  height: 200px;
+  /* background-color: rgba(255, 255, 255, 0.1); */
+  background-color: rgba(0, 0, 0, 0.2); /* Darker background */
+  border-radius: 5px; /* Sharper edges */
+  position: relative;
+  overflow: hidden;
+  /* border: 2px solid rgba(255, 255, 255, 0.3); */
+  border: 1px solid var(--border-color);
+}
+
+.bin-fill {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  width: 100%;
+  height: 0%; /* Will be animated */
+  transition: height 0.5s ease, opacity 0.5s ease; /* Add opacity transition */
+  border-radius: 0 0 4px 4px; /* Match container radius */
+  opacity: 0.5; /* Start semi-transparent */
+}
+
+.bin-label {
+  margin-top: 10px;
+  font-weight: 500;
+  text-align: center;
+}
+
+.bin-percentage {
+  font-size: 1.2rem;
+  font-weight: 600;
+  margin-top: 5px;
+}
+
+.metal .bin-fill { background-color: var(--metal-color); }
+.glass .bin-fill { background-color: var(--glass-color); }
+.plastic .bin-fill { background-color: var(--plastic-color); }
+.carton .bin-fill { background-color: var(--carton-color); }
+
+.metal .bin-icon { color: var(--metal-color); }
+.glass .bin-icon { color: var(--glass-color); }
+.plastic .bin-icon { color: var(--plastic-color); }
+.carton .bin-icon { color: var(--carton-color); }
+
+/* Detection Section */
+.detection-card {
+  overflow: hidden;
+}
+
+.detection-container {
+  display: flex;
+  align-items: center;
+  /* background: rgba(0, 0, 0, 0.05); */
+  background: rgba(0, 0, 0, 0.15);
+  border-radius: 8px;
+  padding: 20px;
+  margin-top: 20px;
+  border: 1px solid var(--border-color);
+}
+
+.detection-icon {
+  font-size: 3rem;
+  margin-right: 20px;
+}
+
+.detection-info {
+  flex: 1;
+}
+
+.detection-class {
+  font-size: 1.5rem;
+  font-weight: 600;
+  margin-bottom: 5px;
+}
+
+.detection-confidence {
+  font-size: 1.1rem;
+  opacity: 0.8;
+}
+
+.confidence-bar-container {
+  height: 8px; /* Thinner bar */
+  /* background-color: rgba(0, 0, 0, 0.1); */
+  background-color: rgba(0, 0, 0, 0.3);
+  border-radius: 4px;
+  margin-top: 15px;
+  width: 100%;
+  overflow: hidden;
+  border: 1px solid var(--border-color);
+}
+
+.confidence-bar {
+  height: 100%;
+  width: 0; /* Will be animated */
+  border-radius: 3px;
+  /* background: linear-gradient(to right, #3498db, #2ecc71); */
+  background: var(--secondary-color); /* Use accent color */
+}
+
+/* Statistics */
+.stats-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 20px;
+  margin-top: 20px;
+}
+
+.stat-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 15px;
+  /* background-color: transparent; */ /* Keep transparent */
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  transition: var(--transition), background-color 0.3s ease; /* Add background transition */
+}
+
+.stat-item:hover {
+  transform: scale(1.03);
+}
+
+/* Highlight effect for statistics update */
+.stat-item.highlight-update {
+  background-color: rgba(0, 255, 155, 0.1); /* Subtle green glow */
+  transition: background-color 0.1s ease-in; /* Fast fade in */
+}
+
+.stat-icon {
+  font-size: 2rem;
+  margin-bottom: 10px;
+}
+
+.stat-count {
+  font-size: 2rem;
+  font-weight: 700;
+  margin-bottom: 5px;
+}
+
+.stat-title {
+  font-size: 1rem;
+  opacity: 0.8;
+}
+
+.metal .stat-icon { color: var(--metal-color); }
+.glass .stat-icon { color: var(--glass-color); }
+.plastic .stat-icon { color: var(--plastic-color); }
+.carton .stat-icon { color: var(--carton-color); }
+
+/* Footer */
+.footer {
+  margin-top: auto;
+  text-align: center;
+  padding: 20px 0;
+  font-size: 0.9rem;
+  opacity: 0.7;
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+  transform: translateY(20px);
+  opacity: 0;
+}
+
+.footer p {
+  margin-bottom: 10px;
+}
+
+/* Animated elements */
+.animate-pulse {
+  animation: pulse 2s infinite;
+}
+
+@keyframes pulse {
+  100% { transform: scale(1); }
+}
+
+/* Theme toggle */
+.theme-toggle {
+  position: fixed;
+  top: 20px;
+  right: 20px;
+  background: var(--card-bg);
+  width: 45px; /* Slightly smaller */
+  height: 45px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  box-shadow: var(--shadow);
+  z-index: 100;
+  border: none;
+  font-size: 1.2rem;
+  color: var(--text-color);
+}
+
+.theme-toggle:hover {
+  transform: rotate(15deg);
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+  /* Ensure single column on smaller screens if auto-fit doesn't suffice */
+  .container {
+     grid-template-columns: 1fr;
+     gap: 25px; /* Reduce gap on smaller screens */
+     padding: 0 15px; /* Reduce padding */
+  }
+  
+  /* Adjust bin layout for smaller screens */
+  .bins-container {
+     flex-wrap: wrap; /* Allow bins to wrap */
+     height: auto; /* Adjust height automatically */
+     gap: 20px; /* Add gap between wrapped bins */
+  }
+  .bin {
+     width: 45%; /* Make bins take up half the width */
+     margin-bottom: 20px; /* Add margin below wrapped bins */
+  }
+
+  .header h1 {
+    font-size: 1.8rem;
+  }
+  
+  .stats-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* --- Fullscreen Fill Level View --- */
+.fullscreen-view {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background-color: rgba(18, 18, 18, 0.98); /* Dark background with slight transparency */
+  z-index: 1000;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 40px;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.5s ease;
+  /* Add backdrop filter for blur effect if desired */
+  /* backdrop-filter: blur(10px); */ 
+}
+
+.fullscreen-view.visible {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.fullscreen-view h2 {
+  font-size: 2.2rem;
+  color: var(--secondary-color);
+  margin-bottom: 40px;
+}
+
+.close-btn {
+  position: absolute;
+  top: 20px;
+  right: 30px;
+  font-size: 2.5rem;
+  color: var(--primary-color);
+  background: none;
+  border: none;
+  cursor: pointer;
+  opacity: 0.7;
+  transition: opacity 0.3s ease, transform 0.3s ease;
+}
+
+.close-btn:hover {
+  opacity: 1;
+  transform: rotate(90deg);
+}
+
+.fullscreen-bins-container {
+  display: flex; /* Display bins side-by-side */
+  gap: 30px;
+  width: 100%;
+  max-width: 1000px; /* Limit width */
+  justify-content: center;
+  align-items: flex-end; /* Align bins at the bottom */
+  height: 60vh; /* Set a height for the container */
+  position: relative; /* Needed for absolute positioning of children */
+}
+
+.fullscreen-bin {
+  flex: 1; /* Distribute space equally */
+  max-width: 200px; /* Max width per bin */
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+}
+
+.fullscreen-bin-header {
+  margin-bottom: 20px;
+  color: var(--primary-color);
+}
+
+.fullscreen-bin-header i {
+  font-size: 2.5rem; /* Larger icons */
+  margin-bottom: 10px;
+  display: block; /* Icon above text */
+}
+
+/* Assign specific colors to icons */
+.fullscreen-bin[data-type="metal"] i { color: var(--metal-color); }
+.fullscreen-bin[data-type="glass"] i { color: var(--glass-color); }
+.fullscreen-bin[data-type="plastic"] i { color: var(--plastic-color); }
+.fullscreen-bin[data-type="carton"] i { color: var(--carton-color); }
+
+.fullscreen-bin-header span {
+  font-size: 1.1rem;
+  font-weight: 500;
+}
+
+.fullscreen-bin-body {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  height: 100%; /* Occupy available height in flex container */
+  justify-content: flex-end; /* Align content to bottom */
+}
+
+/* Estilos para el SVG del cesto */
+.fullscreen-bin-svg {
+  width: 100%;
+  height: 100%; /* Ocupa el espacio disponible en el body */
+  max-height: 300px; /* Limita la altura máxima del SVG */
+  margin-bottom: 15px;
+}
+
+/* Estilo del contorno del cesto */
+.bin-outline {
+  fill: none;
+  stroke: var(--border-color); 
+  stroke-width: 2;
+}
+
+/* Estilo base de la ola */
+.wave-fill {
+  /* El fill color se define en el HTML o JS */
+  /* La transformación inicial se hará con JS */
+  transform: translateY(100px); /* Inicia abajo (fuera de vista) */
+}
+
+.fullscreen-bin-percentage {
+  font-size: 1.4rem;
+  font-weight: 600;
+}
+
+/* --- Navegación y Estado Enfocado en Fullscreen --- */
+.nav-arrow {
+  position: absolute;
+  bottom: 30px;
+  background: rgba(255, 255, 255, 0.1);
+  color: var(--primary-color);
+  border: 1px solid var(--border-color);
+  border-radius: 50%;
+  width: 50px;
+  height: 50px;
+  font-size: 1.5rem;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0;
+  pointer-events: none;
+  transition: all 0.3s ease;
+  z-index: 1001; /* Encima de los bins */
+}
+
+.nav-arrow.prev { left: 30px; }
+.nav-arrow.next { right: 30px; }
+
+.nav-arrow:hover {
+  background: var(--secondary-color);
+  color: var(--background-color);
+  transform: scale(1.1);
+}
+
+/* Mostrar flechas cuando un cesto está enfocado */
+.fullscreen-view.focused .nav-arrow {
+  opacity: 0.8;
+  pointer-events: auto;
+}
+
+/* Estados de los Cestos */
+.fullscreen-bin {
+  transition: transform 0.6s ease, opacity 0.6s ease; /* Transición base para animaciones */
+  /* Inicialmente todos visibles en la vista general */
+  transform: scale(1) translateX(0) translateY(0);
+  opacity: 1;
+}
+
+.fullscreen-bin.focused {
+  /* Estilos del cesto enfocado (más grande, centrado si es necesario) */
+  transform: scale(1.3); /* Más grande */
+  /* Podríamos necesitar ajustar el posicionamiento absoluto o relativo 
+     dependiendo de cómo queramos que se vea centrado. 
+     Por ahora, solo escala. */
+  z-index: 5; /* Asegura que esté por encima de los ocultos */
+}
+
+.fullscreen-bin.hidden-left {
+  /* Oculto fuera de la pantalla a la izquierda */
+  transform: scale(0.5) translateX(-150%);
+  opacity: 0;
+  pointer-events: none;
+}
+
+.fullscreen-bin.hidden-right {
+  /* Oculto fuera de la pantalla a la derecha */
+  transform: scale(0.5) translateX(150%);
+  opacity: 0;
+  pointer-events: none;
+}
+
+/* Estilos para alerta de nivel alto en fullscreen */
+.fullscreen-bin.alert-high .bin-outline {
+  stroke: var(--accent-red); /* Contorno rojo */
+  stroke-width: 3;
+}
+
+.fullscreen-bin.alert-high .fullscreen-bin-percentage {
+  color: var(--accent-red); /* Porcentaje rojo */
+}
+
+/* --- Entry Animation Overlay --- */
+#entry-animation-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background-color: var(--background-color);
+  z-index: 9999;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden; /* Prevent scrollbars during animation */
+  color: var(--primary-color);
+}
+
+.entry-content {
+  position: relative;
+  width: 80%;
+  height: 80%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+#entry-cesto-svg {
+  width: 200px; /* Adjust size as needed */
+  height: 300px;
+  position: absolute; /* Needed for part positioning */
+  /* Center the SVG - adjust offsets if needed */
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  overflow: visible; /* Allow parts to animate from outside */
+}
+
+.entry-part {
+  opacity: 0;
+  transform-origin: center center;
+}
+
+/* Specific initial positions for parts */
+#entry-outline-bottom { transform: translateY(80px) scale(0.8); }
+#entry-outline-top { transform: translateY(-80px) scale(0.8); }
+#entry-wave-group { transform: translateY(50px) scaleY(0); }
+#entry-icon-group { transform: scale(0); }
+/* Note: Font Awesome icon needs extra handling if used inside SVG */
+.entry-icon {
+    font-size: 40px; /* Example size */
+    position: absolute; /* Position within the SVG coordinate space */
+    top: 20px; /* Adjust based on SVG viewbox */
+    left: 50%;
+    transform: translateX(-50%);
+    color: var(--secondary-color);
+}
+
+
+.entry-text {
+  position: absolute;
+  opacity: 0;
+  font-weight: 700;
+}
+
+#entry-title {
+  font-size: 3rem; /* Match reference image */
+  left: 10%; /* Position like reference image */
+  top: 30%;
+  transform: translateX(-50px);
+}
+
+#entry-subtitle {
+  font-size: 2rem;
+  left: 10%;
+  top: 40%;
+  transform: translateX(-50px);
+}
+
+.entry-lines-svg {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    pointer-events: none;
+    z-index: -1; /* Behind other elements */
+}
+
+.entry-line {
+    stroke: rgba(255, 255, 255, 0.1); /* Subtle line color */
+    stroke-width: 1;
+    stroke-dasharray: 5, 5; /* Dashed line effect */
+    /* Initial state for animation if needed */
+    opacity: 0;
+}
+
+/* --- End Entry Animation Overlay --- */

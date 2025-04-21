@@ -432,7 +432,15 @@ def _handle_motor_sequence(target_position, class_name):
     try:
         # 1. Mover a la posición de la clase detectada
         logger.info(f"THREAD: Moviendo a posición {target_position}...")
-        motor_controller.move_motor_to_position(target_position)
+        if motor_controller.USE_RAMPING:
+            motor_controller.move_motor_with_ramping(
+                target_position,
+                motor_controller.RAMPING_START_DELAY,
+                motor_controller.RAMPING_MIN_DELAY,
+                motor_controller.RAMPING_ACCEL_STEPS
+            )
+        else:
+            motor_controller.move_motor_to_position(target_position)
         logger.info(f"THREAD: Motor en posición {target_position}.")
 
         # 2. Esperar a que el objeto caiga
@@ -442,7 +450,15 @@ def _handle_motor_sequence(target_position, class_name):
         # 3. Volver a la posición HOME (si es diferente)
         if target_position != HOME_POSITION_STEPS:
             logger.info(f"THREAD: Volviendo a posición HOME ({HOME_POSITION_STEPS} pasos)...")
-            motor_controller.move_motor_to_position(HOME_POSITION_STEPS)
+            if motor_controller.USE_RAMPING:
+                motor_controller.move_motor_with_ramping(
+                    HOME_POSITION_STEPS,
+                    motor_controller.RAMPING_START_DELAY,
+                    motor_controller.RAMPING_MIN_DELAY,
+                    motor_controller.RAMPING_ACCEL_STEPS
+                )
+            else:
+                motor_controller.move_motor_to_position(HOME_POSITION_STEPS)
             time.sleep(0.5) # Pequeña pausa después de volver
             logger.info("THREAD: Motor en posición HOME.")
         else:
@@ -455,7 +471,15 @@ def _handle_motor_sequence(target_position, class_name):
         # Intentar volver a HOME si falla en medio del movimiento (opcional)
         try:
              logger.info("THREAD: Intentando volver a HOME después de error...")
-             motor_controller.move_motor_to_position(HOME_POSITION_STEPS)
+             if motor_controller.USE_RAMPING:
+                 motor_controller.move_motor_with_ramping(
+                     HOME_POSITION_STEPS,
+                     motor_controller.RAMPING_START_DELAY,
+                     motor_controller.RAMPING_MIN_DELAY,
+                     motor_controller.RAMPING_ACCEL_STEPS
+                 )
+             else:
+                 motor_controller.move_motor_to_position(HOME_POSITION_STEPS)
         except Exception as e2:
              logger.error(f"ERROR EN THREAD: No se pudo volver a HOME: {e2}")
 
@@ -1007,7 +1031,7 @@ class AppGUI:
         """Crea un panel de estado para mostrar información en tiempo real."""
         # Panel principal para estadísticas
         stats_frame = Frame(self.parent, bg='#f0f0f0', padx=10, pady=10, relief="ridge", bd=2)
-        stats_frame.place(x=10, y=170, width=300, height=380)  # Aumentar altura para acomodar nuevos indicadores
+        stats_frame.place(x=10, y=170, width=300, height=380)  # Ajustar altura para acomodar nuevos indicadores
         
         # Título del panel
         title_label = Label(stats_frame, text="ESTADO DEL SISTEMA", 
@@ -1265,7 +1289,15 @@ class AppGUI:
         try:
             # 1. Mover a la posición de la clase detectada
             logger.info(f"THREAD: Moviendo a posición {target_position}...")
-            motor_controller.move_motor_to_position(target_position)
+            if motor_controller.USE_RAMPING:
+                motor_controller.move_motor_with_ramping(
+                    target_position,
+                    motor_controller.RAMPING_START_DELAY,
+                    motor_controller.RAMPING_MIN_DELAY,
+                    motor_controller.RAMPING_ACCEL_STEPS
+                )
+            else:
+                motor_controller.move_motor_to_position(target_position)
             logger.info(f"THREAD: Motor en posición {target_position}.")
 
             # 2. Esperar a que el objeto caiga
@@ -1275,7 +1307,15 @@ class AppGUI:
             # 3. Volver a la posición HOME (si es diferente)
             if target_position != HOME_POSITION_STEPS:
                 logger.info(f"THREAD: Volviendo a posición HOME ({HOME_POSITION_STEPS} pasos)...")
-                motor_controller.move_motor_to_position(HOME_POSITION_STEPS)
+                if motor_controller.USE_RAMPING:
+                    motor_controller.move_motor_with_ramping(
+                        HOME_POSITION_STEPS,
+                        motor_controller.RAMPING_START_DELAY,
+                        motor_controller.RAMPING_MIN_DELAY,
+                        motor_controller.RAMPING_ACCEL_STEPS
+                    )
+                else:
+                    motor_controller.move_motor_to_position(HOME_POSITION_STEPS)
                 time.sleep(0.5)  # Pequeña pausa después de volver
                 logger.info("THREAD: Motor en posición HOME.")
             else:
@@ -1288,7 +1328,15 @@ class AppGUI:
             # Intentar volver a HOME si falla en medio del movimiento (opcional)
             try:
                  logger.info("THREAD: Intentando volver a HOME después de error...")
-                 motor_controller.move_motor_to_position(HOME_POSITION_STEPS)
+                 if motor_controller.USE_RAMPING:
+                     motor_controller.move_motor_with_ramping(
+                         HOME_POSITION_STEPS,
+                         motor_controller.RAMPING_START_DELAY,
+                         motor_controller.RAMPING_MIN_DELAY,
+                         motor_controller.RAMPING_ACCEL_STEPS
+                     )
+                 else:
+                     motor_controller.move_motor_to_position(HOME_POSITION_STEPS)
             except Exception as e2:
                  logger.error(f"ERROR EN THREAD: No se pudo volver a HOME: {e2}")
 
@@ -1581,5 +1629,6 @@ if __name__ == "__main__":
     logger.info(" Iniciando Aplicación Cesto Inteligente ")
     logger.info("=============================================")
     main_app()
+    logger.info("=============================================")
     logger.info("Aplicación finalizada.")
     logger.info("=============================================")

@@ -1,0 +1,265 @@
+<!DOCTYPE html>
+<html lang="es" class="dark-mode">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Cesto Inteligente - Dashboard</title>
+    <link rel="stylesheet" href="./styles.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+</head>
+<body>
+    <div id="entry-animation-overlay">
+        <div class="entry-content">
+            <svg id="entry-cesto-svg" viewBox="0 0 100 150">
+                <!-- Parts will be added dynamically or predefined if simpler -->
+                <path id="entry-outline-bottom" class="entry-part" d="M20,140 Q50,150 80,140 L70,100 L30,100 Z" fill="none" stroke="currentColor" stroke-width="2"/>
+                <path id="entry-outline-top" class="entry-part" d="M30,100 L70,100 L80,50 Q50,40 20,50 Z" fill="none" stroke="currentColor" stroke-width="2"/>
+                <g id="entry-wave-group" class="entry-part">
+                     <path id="entry-wave" fill="var(--secondary-color)" d="M -50 90 Q -25 80 0 90 T 50 90 T 100 90 T 150 90 V 150 H -50 Z"/>
+                </g>
+                <g id="entry-icon-group" class="entry-part">
+                    <i class="fas fa-recycle entry-icon"></i> <!-- Placeholder, ideally SVG icon -->
+                </g>
+            </svg>
+            <div id="entry-title" class="entry-text">Cesto Inteligente</div>
+            <div id="entry-subtitle" class="entry-text">Tesis de grado.</div>
+            <!-- Optional decorative lines -->
+            <svg id="entry-lines" class="entry-lines-svg">
+                <line class="entry-line" x1="50%" y1="0" x2="50%" y2="100%" />
+            </svg>
+        </div>
+    </div>
+
+    <button id="theme-toggle" class="theme-toggle">
+        <i class="fas fa-moon"></i>
+    </button>
+    
+    <div class="dashboard">
+        <header class="header" id="header">
+            <h1><i class="fas fa-recycle"></i> Cesto Inteligente</h1>
+            <p>Dashboard de monitoreo en tiempo real</p>
+        </header>
+        
+        <div class="container" id="main-container">
+            <!-- Niveles de llenado -->
+            <section class="dashboard-section" id="fill-levels">
+                <h2 class="card-title"><i class="fas fa-fill"></i> Niveles de Llenado</h2>
+                <div class="bins-container">
+                    <div class="bin metal">
+                        <div class="bin-icon"><i class="fas fa-bolt"></i></div>
+                        <div class="bin-container">
+                            <div class="bin-fill" id="metal-fill"></div>
+                        </div>
+                        <div class="bin-label">Metal</div>
+                        <div class="bin-percentage" id="metal-percentage">0%</div>
+                    </div>
+                    <div class="bin glass">
+                        <div class="bin-icon"><i class="fas fa-wine-glass-alt"></i></div>
+                        <div class="bin-container">
+                            <div class="bin-fill" id="glass-fill"></div>
+                        </div>
+                        <div class="bin-label">Vidrio</div>
+                        <div class="bin-percentage" id="glass-percentage">0%</div>
+                    </div>
+                    <div class="bin plastic">
+                        <div class="bin-icon"><i class="fas fa-flask"></i></div>
+                        <div class="bin-container">
+                            <div class="bin-fill" id="plastic-fill"></div>
+                        </div>
+                        <div class="bin-label">Plástico</div>
+                        <div class="bin-percentage" id="plastic-percentage">0%</div>
+                    </div>
+                    <div class="bin carton">
+                        <div class="bin-icon"><i class="fas fa-box"></i></div>
+                        <div class="bin-container">
+                            <div class="bin-fill" id="carton-fill"></div>
+                        </div>
+                        <div class="bin-label">Cartón</div>
+                        <div class="bin-percentage" id="carton-percentage">0%</div>
+                    </div>
+                </div>
+            </section>
+            
+            <!-- Última Detección -->
+            <section class="dashboard-section" id="detection">
+                <h2 class="card-title"><i class="fas fa-eye"></i> Última Detección</h2>
+                <div class="detection-container" id="detection-container">
+                    <div class="detection-icon">
+                        <i class="fas fa-question-circle" id="detection-icon-inner"></i>
+                    </div>
+                    <div class="detection-info">
+                        <div class="detection-class" id="detection-class">Sin detecciones recientes</div>
+                        <div class="detection-confidence" id="detection-confidence">Confianza: N/A</div>
+                        <div class="confidence-bar-container">
+                            <div class="confidence-bar" id="confidence-bar"></div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+            
+            <!-- Estadísticas -->
+            <section class="dashboard-section" id="statistics">
+                <h2 class="card-title"><i class="fas fa-chart-pie"></i> Estadísticas</h2>
+                <div class="stats-grid">
+                    <div class="stat-item metal">
+                        <div class="stat-icon"><i class="fas fa-bolt"></i></div>
+                        <div class="stat-count" id="metal-count">0</div>
+                        <div class="stat-title">Metal</div>
+                    </div>
+                    <div class="stat-item glass">
+                        <div class="stat-icon"><i class="fas fa-wine-glass-alt"></i></div>
+                        <div class="stat-count" id="glass-count">0</div>
+                        <div class="stat-title">Vidrio</div>
+                    </div>
+                    <div class="stat-item plastic">
+                        <div class="stat-icon"><i class="fas fa-flask"></i></div>
+                        <div class="stat-count" id="plastic-count">0</div>
+                        <div class="stat-title">Plástico</div>
+                    </div>
+                    <div class="stat-item carton">
+                        <div class="stat-icon"><i class="fas fa-box"></i></div>
+                        <div class="stat-count" id="carton-count">0</div>
+                        <div class="stat-title">Cartón</div>
+                    </div>
+                </div>
+            </section>
+            
+            <!-- Estado del Sistema -->
+            <section class="dashboard-section" id="system-status-section">
+                <h2 class="card-title"><i class="fas fa-info-circle"></i> Estado del Sistema</h2>
+                <div class="info-container">
+                    <div class="info-item">
+                        <div class="info-label">Estado:</div>
+                        <div class="info-value" id="system-status">Conectando...</div>
+                    </div>
+                    <div class="info-item">
+                        <div class="info-label">Última actualización:</div>
+                        <div class="info-value" id="last-update">-</div>
+                    </div>
+                    <div class="info-item">
+                        <div class="info-label">Mensaje:</div>
+                        <div class="info-value" id="status-message">Iniciando conexión...</div>
+                    </div>
+                </div>
+            </section>
+        </div>
+        
+        <footer class="footer" id="footer">
+            <p>Desarrollado por Gabriel Calderón, Elias Bautista, Cristian Hernandez</p>
+            <p>&copy; 2024 Cesto Inteligente - Dashboard v2.0</p>
+        </footer>
+    </div>
+
+    <!-- Vista Pantalla Completa - Niveles de Llenado -->
+    <div id="fullscreen-fill-levels" class="fullscreen-view">
+        <button id="close-fullscreen-btn" class="close-btn">&times;</button>
+        <h2>Niveles de Llenado Detallados</h2>
+        <div class="fullscreen-bins-container">
+            <!-- Los bins se añadirán aquí dinámicamente o se pueden predefinir -->
+            <div class="fullscreen-bin" data-type="metal">
+                <div class="fullscreen-bin-header">
+                    <i class="fas fa-bolt"></i>
+                    <span>Metal</span>
+                </div>
+                <div class="fullscreen-bin-body">
+                    <svg class="fullscreen-bin-svg" viewBox="0 0 80 100" preserveAspectRatio="xMidYMax meet">
+                        <defs>
+                            <clipPath id="clip-metal">
+                                <!-- Path del cesto para clipping -->
+                                <path d="M10,0 L70,0 L65,100 L15,100 Z"></path>
+                            </clipPath>
+                        </defs>
+                        <!-- Path visible del cesto (contorno) -->
+                        <path class="bin-outline" d="M10,0 L70,0 L65,100 L15,100 Z"></path>
+                        <!-- Grupo para el líquido con clipping -->
+                        <g clip-path="url(#clip-metal)">
+                            <!-- Path de la ola (ajustado para empezar en y=0) -->
+                            <g class="wave-group" id="wave-metal">
+                                <path class="wave-fill" fill="var(--metal-color)" d="M -40 0 Q -20 0 0 0 T 40 0 T 80 0 T 120 0 V 100 H -40 Z"></path>
+                            </g>
+                         </g>
+                    </svg>
+                    <div class="fullscreen-bin-percentage" id="fullscreen-metal-percentage">0%</div>
+                </div>
+            </div>
+            <div class="fullscreen-bin" data-type="glass">
+                 <div class="fullscreen-bin-header">
+                    <i class="fas fa-wine-glass-alt"></i>
+                    <span>Vidrio</span>
+                </div>
+                <div class="fullscreen-bin-body">
+                    <svg class="fullscreen-bin-svg" viewBox="0 0 80 100" preserveAspectRatio="xMidYMax meet">
+                         <defs>
+                            <clipPath id="clip-glass">
+                                <path d="M10,0 L70,0 L65,100 L15,100 Z"></path>
+                            </clipPath>
+                        </defs>
+                        <path class="bin-outline" d="M10,0 L70,0 L65,100 L15,100 Z"></path>
+                        <g clip-path="url(#clip-glass)">
+                            <!-- Path de la ola (ajustado para empezar en y=0) -->
+                             <g class="wave-group" id="wave-glass">
+                                <path class="wave-fill" fill="var(--glass-color)" d="M -40 0 Q -20 0 0 0 T 40 0 T 80 0 T 120 0 V 100 H -40 Z"></path>
+                            </g>
+                        </g>
+                    </svg>
+                    <div class="fullscreen-bin-percentage" id="fullscreen-glass-percentage">0%</div>
+                </div>
+            </div>
+             <div class="fullscreen-bin" data-type="plastic">
+                 <div class="fullscreen-bin-header">
+                    <i class="fas fa-flask"></i>
+                    <span>Plástico</span>
+                </div>
+                <div class="fullscreen-bin-body">
+                    <svg class="fullscreen-bin-svg" viewBox="0 0 80 100" preserveAspectRatio="xMidYMax meet">
+                         <defs>
+                            <clipPath id="clip-plastic">
+                                <path d="M10,0 L70,0 L65,100 L15,100 Z"></path>
+                            </clipPath>
+                        </defs>
+                        <path class="bin-outline" d="M10,0 L70,0 L65,100 L15,100 Z"></path>
+                        <g clip-path="url(#clip-plastic)">
+                            <!-- Path de la ola (ajustado para empezar en y=0) -->
+                             <g class="wave-group" id="wave-plastic">
+                                <path class="wave-fill" fill="var(--plastic-color)" d="M -40 0 Q -20 0 0 0 T 40 0 T 80 0 T 120 0 V 100 H -40 Z"></path>
+                             </g>
+                         </g>
+                    </svg>
+                    <div class="fullscreen-bin-percentage" id="fullscreen-plastic-percentage">0%</div>
+                </div>
+            </div>
+             <div class="fullscreen-bin" data-type="carton">
+                 <div class="fullscreen-bin-header">
+                    <i class="fas fa-box"></i>
+                    <span>Cartón</span>
+                </div>
+                <div class="fullscreen-bin-body">
+                    <svg class="fullscreen-bin-svg" viewBox="0 0 80 100" preserveAspectRatio="xMidYMax meet">
+                         <defs>
+                            <clipPath id="clip-carton">
+                                <path d="M10,0 L70,0 L65,100 L15,100 Z"></path>
+                            </clipPath>
+                        </defs>
+                        <path class="bin-outline" d="M10,0 L70,0 L65,100 L15,100 Z"></path>
+                        <g clip-path="url(#clip-carton)">
+                            <!-- Path de la ola (ajustado para empezar en y=0) -->
+                            <g class="wave-group" id="wave-carton">
+                                <path class="wave-fill" fill="var(--carton-color)" d="M -40 0 Q -20 0 0 0 T 40 0 T 80 0 T 120 0 V 100 H -40 Z"></path>
+                            </g>
+                        </g>
+                    </svg>
+                    <div class="fullscreen-bin-percentage" id="fullscreen-carton-percentage">0%</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Flechas de Navegación -->
+        <button id="prev-bin-btn" class="nav-arrow prev"><i class="fas fa-chevron-left"></i></button>
+        <button id="next-bin-btn" class="nav-arrow next"><i class="fas fa-chevron-right"></i></button>
+    </div>
+    <!-- Fin Vista Pantalla Completa -->
+
+    <!-- Script principal -->
+    <script type="module" src="/src/main.js"></script>
+</body>
+</html>

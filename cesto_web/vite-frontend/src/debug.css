@@ -1,0 +1,32 @@
+/* Debug CSS to help visualize elements */
+.section-content {
+    opacity: 1 !important;
+    transform: none !important;
+    visibility: visible !important;
+}
+
+.fill-item, .stat-card, .info-container, .detection-wrapper {
+    opacity: 1 !important;
+    transform: none !important;
+}
+
+.fill-bar {
+    transition: height 0.5s ease-out !important;
+}
+
+.nav-panel {
+    opacity: 1 !important;
+    visibility: visible !important;
+    display: block !important;
+    transform: none !important;
+}
+
+.hidden {
+    display: none !important;
+}
+
+.visible {
+    display: block !important;
+    opacity: 1 !important;
+    visibility: visible !important;
+}
